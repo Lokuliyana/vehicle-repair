@@ -67,7 +67,11 @@ export const router = createBrowserRouter([
       },
       {
         path: 'reports',
-        element: <ReportsPage />,
+        element: (
+          <ProtectedRoute requiredPermission="canAccessReports" allowedRoles={['OWNER', 'WORKSHOP_MANAGER']}>
+            <ReportsPage />
+          </ProtectedRoute>
+        ),
       },
       {
         path: '*',

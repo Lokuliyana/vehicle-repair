@@ -152,6 +152,17 @@ export function isDateInFilter(
       return itemDateStr.startsWith(yearMonth);
     }
 
+    case 'THIS_QUARTER': {
+      const currentMonth = referenceNow.getMonth(); // 0-11
+      const quarterStartMonth = Math.floor(currentMonth / 3) * 3;
+      const quarterEndMonth = quarterStartMonth + 2;
+      const year = referenceNow.getFullYear();
+      const startStr = `${year}-${String(quarterStartMonth + 1).padStart(2, '0')}-01`;
+      const endDay = new Date(year, quarterEndMonth + 1, 0).getDate();
+      const endStr = `${year}-${String(quarterEndMonth + 1).padStart(2, '0')}-${String(endDay).padStart(2, '0')}`;
+      return itemDateStr >= startStr && itemDateStr <= endStr;
+    }
+
     case 'CUSTOM': {
       let matches = true;
       let start = filter.startDate?.trim();

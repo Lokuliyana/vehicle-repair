@@ -9,6 +9,7 @@ export interface RolePermissions {
   canApproveEstimates: boolean;
   canAccessFinance: boolean;
   canRecordExpenses: boolean;
+  canAccessReports: boolean;
 }
 
 export interface UserProfile {
@@ -49,6 +50,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     canApproveEstimates: true,
     canAccessFinance: true,
     canRecordExpenses: true,
+    canAccessReports: true,
   },
   WORKSHOP_MANAGER: {
     canViewCosts: true,
@@ -59,6 +61,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     canApproveEstimates: true,
     canAccessFinance: true,
     canRecordExpenses: true,
+    canAccessReports: true,
   },
   SERVICE_ADVISOR: {
     canViewCosts: false,
@@ -69,6 +72,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     canApproveEstimates: false,
     canAccessFinance: false,
     canRecordExpenses: false,
+    canAccessReports: false,
   },
   CASHIER: {
     canViewCosts: false,
@@ -79,6 +83,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     canApproveEstimates: false,
     canAccessFinance: false,
     canRecordExpenses: true,
+    canAccessReports: false,
   },
   TECHNICIAN: {
     canViewCosts: false,
@@ -89,6 +94,7 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
     canApproveEstimates: false,
     canAccessFinance: false,
     canRecordExpenses: false,
+    canAccessReports: false,
   },
 };
 

@@ -54,6 +54,15 @@ describe('Auth & Role Permissions Matrix', () => {
     expect(ROLE_PERMISSIONS.CASHIER.canManageJobCards).toBe(false);
     expect(ROLE_PERMISSIONS.TECHNICIAN.canManageJobCards).toBe(false);
   });
+
+  it('verifies Executive Reports & Analytics access is restricted strictly to OWNER and WORKSHOP_MANAGER', () => {
+    expect(ROLE_PERMISSIONS.OWNER.canAccessReports).toBe(true);
+    expect(ROLE_PERMISSIONS.WORKSHOP_MANAGER.canAccessReports).toBe(true);
+
+    expect(ROLE_PERMISSIONS.SERVICE_ADVISOR.canAccessReports).toBe(false);
+    expect(ROLE_PERMISSIONS.CASHIER.canAccessReports).toBe(false);
+    expect(ROLE_PERMISSIONS.TECHNICIAN.canAccessReports).toBe(false);
+  });
 });
 
 describe('AuthProvider & useAuth Context Execution', () => {

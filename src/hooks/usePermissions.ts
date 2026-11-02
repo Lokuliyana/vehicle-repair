@@ -23,6 +23,7 @@ export function usePermissions() {
     canApproveEstimates: permissions.canApproveEstimates,
     canAccessFinance: permissions.canAccessFinance,
     canRecordExpenses: permissions.canRecordExpenses,
+    canAccessReports: permissions.canAccessReports,
     isCostProfitVisible,
     toggleCostProfitVisible,
     setCostProfitVisible,

@@ -55,6 +55,7 @@ export type DateRangeOption =
   | 'YESTERDAY'
   | 'THIS_WEEK'
   | 'THIS_MONTH'
+  | 'THIS_QUARTER'
   | 'ALL_TIME'
   | 'CUSTOM';
 
@@ -62,6 +63,145 @@ export interface DateRangeFilter {
   range: DateRangeOption;
   startDate?: string; // YYYY-MM-DD
   endDate?: string; // YYYY-MM-DD
+}
+
+// -------------------------------------------------------------------------
+// Phase 9: Reports & Analytics Domain Types
+// -------------------------------------------------------------------------
+
+export interface RevenueStreamMetric {
+  name: string;
+  revenueRs: number;
+  costRs: number;
+  grossProfitRs: number;
+  grossMarginPct: number;
+  percentageOfTotalRevenue: number;
+}
+
+export interface SalesGrossProfitReportData {
+  dateRange: DateRangeFilter;
+  totalNetSalesRs: number;
+  totalDirectCostRs: number;
+  combinedGrossProfitRs: number;
+  grossMarginPct: number;
+  streams: {
+    workshopLabor: RevenueStreamMetric;
+    workshopParts: RevenueStreamMetric;
+    counterPosSales: RevenueStreamMetric;
+  };
+  invoicedJobsCount: number;
+  posSalesCount: number;
+}
+
+export type InsuranceAgingBucketKey = '0_30' | '31_60' | '61_90' | '90_PLUS';
+
+export interface InsuranceAgingBucketSummary {
+  bucketKey: InsuranceAgingBucketKey;
+  label: string;
+  claimCount: number;
+  totalApprovedRs: number;
+  totalSettledRs: number;
+  outstandingBalanceRs: number;
+}
+
+export interface InsuranceCompanyAgingSummary {
+  insuranceCompany: string;
+  totalApprovedClaimsRs: number;
+  settledAmountRs: number;
+  outstandingBalanceRs: number;
+  oldestClaimDays: number;
+  claimCount: number;
+}
+
+export interface ItemizedInsuranceClaim {
+  jobId: string;
+  jobNumber: string;
+  vehiclePlate: string;
+  vehicleMakeModel: string;
+  insuranceCompany: string;
+  invoiceDate: string;
+  agingDays: number;
+  agingBucket: InsuranceAgingBucketKey;
+  bucketLabel: string;
+  approvedClaimRs: number;
+  settledAmountRs: number;
+  balanceDueRs: number;
+  docStage: import('@/features/workshop/types').DocumentStage;
+}
+
+export interface InsuranceAgingReportData {
+  referenceDate: string;
+  totalApprovedClaimsRs: number;
+  totalSettledAmountRs: number;
+  totalOutstandingClaimsRs: number;
+  buckets: Record<InsuranceAgingBucketKey, InsuranceAgingBucketSummary>;
+  companySummaries: InsuranceCompanyAgingSummary[];
+  itemizedClaims: ItemizedInsuranceClaim[];
+}
+
+export type TechnicianVelocityStatus = 'AHEAD' | 'ON_TRACK' | 'BEHIND';
+
+export interface TechnicianTurnaroundMetric {
+  technicianName: string;
+  totalAssignedTasks: number;
+  completedTasks: number;
+  taskCompletionRatePct: number;
+  completedJobsCount: number;
+  activeInProgressJobsCount: number;
+  avgEstimatedTargetDays: number;
+  avgTurnaroundDays: number;
+  velocityStatus: TechnicianVelocityStatus;
+}
+
+export interface TechnicianVelocityReportData {
+  totalActiveTechnicians: number;
+  totalAssignedTasks: number;
+  totalCompletedTasks: number;
+  overallCompletionRatePct: number;
+  overallAvgTargetDays: number;
+  overallAvgTurnaroundDays: number;
+  technicians: TechnicianTurnaroundMetric[];
+}
+
+export interface FastMovingPartMetric {
+  catalogItemId?: string;
+  sku: string;
+  barcode?: string;
+  name: string;
+  category: string;
+  uom: string;
+  workshopQtyUsed: number;
+  posQtySold: number;
+  totalQtyConsumed: number;
+  totalRevenueRs: number;
+  totalCostRs: number;
+  grossProfitRs: number;
+  grossMarginPct: number;
+}
+
+export type StockAlertSeverity = 'OUT_OF_STOCK' | 'LOW_STOCK';
+
+export interface LowStockAlertItem {
+  catalogItemId: string;
+  sku: string;
+  barcode?: string;
+  name: string;
+  category: string;
+  uom: string;
+  stockQty: number;
+  lowStockAlertLevel: number;
+  deficitQty: number;
+  status: StockAlertSeverity;
+  buyingCostRs: number;
+  sellingPriceRs: number;
+}
+
+export interface InventoryVelocityAndAlertsReportData {
+  fastMovingParts: FastMovingPartMetric[];
+  lowStockAlerts: LowStockAlertItem[];
+  totalLowStockItemsCount: number;
+  totalOutOfStockItemsCount: number;
+  totalInventoryDeficitQty: number;
 }
 
 export interface ProfitLedgerSummary {

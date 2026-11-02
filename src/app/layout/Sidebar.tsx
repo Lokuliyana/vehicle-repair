@@ -66,6 +66,7 @@ const NAV_ITEMS: NavItem[] = [
     title: 'Reports & Aging',
     path: '/reports',
     icon: BarChart3,
+    requiredPermission: 'canAccessReports',
   },
   {
     title: 'Phase 1 Bench',
