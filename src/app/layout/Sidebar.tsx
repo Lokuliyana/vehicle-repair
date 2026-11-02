@@ -1,5 +1,5 @@
 import type { ComponentType } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink, Link, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
   FileSpreadsheet,
@@ -82,10 +82,15 @@ export function Sidebar({ onCloseMobile }: { onCloseMobile?: () => void }) {
   return (
     <aside
       className="flex flex-col h-full bg-slate-900 text-slate-100 border-r border-slate-800 w-64 select-none screen-only no-print"
-      data-testid="desktop-sidebar"
+      data-testid={onCloseMobile ? 'mobile-sidebar' : 'desktop-sidebar'}
     >
       {/* Brand & Workshop Identity */}
-      <div className="h-16 flex items-center px-5 border-b border-slate-800 gap-3">
+      <Link
+        to="/"
+        onClick={onCloseMobile}
+        className="h-16 flex items-center px-5 border-b border-slate-800 gap-3 hover:bg-slate-800/40 transition-colors"
+        data-testid="sidebar-brand-link"
+      >
         <div className="bg-amber-500 text-slate-950 p-2 rounded-lg font-black tracking-tight flex items-center justify-center shadow-xs">
           <Car className="h-5 w-5" />
         </div>
@@ -97,7 +102,7 @@ export function Sidebar({ onCloseMobile }: { onCloseMobile?: () => void }) {
             Workshop & POS Master
           </div>
         </div>
-      </div>
+      </Link>
 
       {/* Navigation Links */}
       <div className="flex-1 py-4 px-3 space-y-1 overflow-y-auto">

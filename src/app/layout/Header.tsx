@@ -1,4 +1,4 @@
-import { useState, type FormEvent, type ChangeEvent } from 'react';
+import { useState, useRef, useEffect, type FormEvent, type ChangeEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Menu,
@@ -15,6 +15,7 @@ import { useAuth } from '@/app/providers/AuthProvider';
 import { UserRole } from '@/types';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/toast';
+import { cn } from '@/utils/cn';
 
 export function Header({
   onToggleMobile,
@@ -32,6 +33,20 @@ export function Header({
   const navigate = useNavigate();
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Global ⌘K / Ctrl+K keyboard shortcut to focus global search
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+        searchInputRef.current?.select();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   const handleRoleChange = (e: ChangeEvent<HTMLSelectElement>) => {
     const newRole = e.target.value as UserRole;
@@ -77,6 +92,7 @@ export function Header({
         <form onSubmit={handleSearchSubmit} className="relative flex-1">
           <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
+            ref={searchInputRef}
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -95,14 +111,34 @@ export function Header({
         {/* Active POS Shift Pill */}
         {activeShift && (
           <div
-            className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 text-emerald-800 border border-emerald-200/80 rounded-full text-xs font-medium cursor-pointer"
+            className={cn(
+              "hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium cursor-pointer transition-colors",
+              activeShift.status === 'OPEN'
+                ? "bg-emerald-50 text-emerald-800 border border-emerald-200/80"
+                : "bg-slate-100 text-slate-700 border border-slate-300"
+            )}
             onClick={() => navigate('/pos')}
-            title={`Active Register: ${activeShift.id} (${activeShift.cashierName})`}
+            title={
+              activeShift.status === 'OPEN'
+                ? `Active Register: ${activeShift.id} (${activeShift.cashierName})`
+                : `Closed Register: ${activeShift.id}`
+            }
             data-testid="active-shift-pill"
           >
-            <CircleDot className="w-3.5 h-3.5 text-emerald-600 animate-pulse" />
+            <CircleDot
+              className={cn(
+                "w-3.5 h-3.5",
+                activeShift.status === 'OPEN' ? "text-emerald-600 animate-pulse" : "text-slate-400"
+              )}
+            />
             <span className="font-semibold">{activeShift.id}:</span>
-            <span className="text-[11px] text-emerald-700">OPEN</span>
+            <span
+              className={
+                activeShift.status === 'OPEN' ? "text-[11px] text-emerald-700" : "text-[11px] text-slate-500"
+              }
+            >
+              {activeShift.status}
+            </span>
           </div>
         )}
 
@@ -151,7 +187,7 @@ export function Header({
         </div>
 
         {/* Global Quick Action Buttons */}
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5" data-testid="global-quick-actions">
           <Button
             variant="default"
             size="sm"

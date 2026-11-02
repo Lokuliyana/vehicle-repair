@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 
 export function RoleDashboardPage() {
-  const { user, role, permissions, isCostProfitVisible } = useAuth();
+  const { user, role, permissions, isCostProfitVisible, activeShift } = useAuth();
   const navigate = useNavigate();
 
   return (
@@ -263,8 +263,12 @@ export function RoleDashboardPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
               <div className="text-xs font-semibold text-slate-500">Active Register Drawer</div>
-              <div className="text-2xl font-black text-emerald-600 mt-2">Shift #001: OPEN</div>
-              <div className="text-xs text-slate-500 mt-1">Starting Float: Rs. 15,000.00</div>
+              <div className="text-2xl font-black text-emerald-600 mt-2">
+                {activeShift ? `${activeShift.id}: ${activeShift.status}` : 'No Active Shift'}
+              </div>
+              <div className="text-xs text-slate-500 mt-1">
+                {activeShift ? `Starting Float: ${formatRs(activeShift.startingCashRs)}` : 'Register closed'}
+              </div>
             </div>
             <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
               <div className="text-xs font-semibold text-slate-500">Today's Counter POS Sales</div>

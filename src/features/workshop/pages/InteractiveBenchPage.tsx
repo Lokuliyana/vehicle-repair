@@ -478,7 +478,7 @@ export function InteractiveBenchPage() {
             title="1. Labor - Remove & Reassemble"
             sectionNumber={1}
             items={jobSheet.lines}
-            isCostProfitVisible={isCostProfitVisible && permissions.canViewCosts && permissions.canViewGrossProfit}
+            isCostProfitVisible={isCostProfitVisible}
             isJobCardMode={jobSheet.docStage === 'JOB_CARD'}
             onItemsChange={handleLinesChange}
           />
@@ -489,7 +489,7 @@ export function InteractiveBenchPage() {
             title="2. Labor - Repair"
             sectionNumber={2}
             items={jobSheet.lines}
-            isCostProfitVisible={isCostProfitVisible && permissions.canViewCosts && permissions.canViewGrossProfit}
+            isCostProfitVisible={isCostProfitVisible}
             isJobCardMode={jobSheet.docStage === 'JOB_CARD'}
             onItemsChange={handleLinesChange}
           />
@@ -500,7 +500,7 @@ export function InteractiveBenchPage() {
             title="3. Replacement Parts"
             sectionNumber={3}
             items={jobSheet.lines}
-            isCostProfitVisible={isCostProfitVisible && permissions.canViewCosts && permissions.canViewGrossProfit}
+            isCostProfitVisible={isCostProfitVisible}
             isJobCardMode={jobSheet.docStage === 'JOB_CARD'}
             onItemsChange={handleLinesChange}
           />

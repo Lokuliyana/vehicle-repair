@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
 import { Plus, ShoppingCart, X } from 'lucide-react';
 import { Sidebar } from './Sidebar';
@@ -8,6 +8,17 @@ import { Button } from '@/components/ui/button';
 export function AppShell() {
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const navigate = useNavigate();
+
+  // Close mobile navigation on Escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isMobileNavOpen) {
+        setIsMobileNavOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isMobileNavOpen]);
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-slate-100 text-slate-900">

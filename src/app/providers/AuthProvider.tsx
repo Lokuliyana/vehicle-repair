@@ -29,25 +29,28 @@ const STORAGE_KEY_COST_MODE = 'antigravity_cost_mode_visible';
 
 export function AuthProvider({
   children,
-  initialRole = 'OWNER',
+  initialRole,
 }: {
   children: React.ReactNode;
   initialRole?: UserRole;
 }) {
   const [role, setRoleState] = useState<UserRole>(() => {
+    if (initialRole) {
+      return initialRole;
+    }
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem(STORAGE_KEY_ROLE) as UserRole | null;
       if (saved && ROLE_PERMISSIONS[saved]) {
         return saved;
       }
     }
-    return initialRole;
+    return 'OWNER';
   });
 
   const permissions = useMemo(() => ROLE_PERMISSIONS[role], [role]);
 
   // Privacy invariant: ONLY OWNER & WORKSHOP_MANAGER can view costs and gross profit
-  const [isCostProfitVisible, setIsCostProfitVisibleState] = useState<boolean>(() => {
+  const [isCostProfitVisibleState, setIsCostProfitVisibleState] = useState<boolean>(() => {
     const roleCanView = ROLE_PERMISSIONS[role].canViewCosts && ROLE_PERMISSIONS[role].canViewGrossProfit;
     if (!roleCanView) return false;
     if (typeof window !== 'undefined') {
@@ -56,6 +59,16 @@ export function AuthProvider({
     }
     return true;
   });
+
+  // Architectural privacy invariant: Under NO circumstance can isCostProfitVisible be true
+  // if the current role lacks permission to view costs and gross profit.
+  const isCostProfitVisible = useMemo(() => {
+    return Boolean(
+      isCostProfitVisibleState &&
+      permissions.canViewCosts &&
+      permissions.canViewGrossProfit
+    );
+  }, [isCostProfitVisibleState, permissions]);
 
   // Automatically enforce privacy invariant when role changes:
   // Non-owner / non-manager roles MUST NEVER have cost/profit visibility active.

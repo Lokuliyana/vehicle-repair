@@ -2,6 +2,7 @@ import React from 'react';
 import { render, screen, renderHook, act } from '@testing-library/react';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { AuthProvider, useAuth } from '@/app/providers/AuthProvider';
+import { usePermissions } from '@/hooks/usePermissions';
 import { PermissionGate } from '@/components/auth/PermissionGate';
 import { ROLE_PERMISSIONS } from '@/types';
 
@@ -212,5 +213,56 @@ describe('PermissionGate UI Guard', () => {
 
     // CASHIER has both canAccessPos and canRecordExpenses
     expect(screen.getByTestId('cashier-actions')).toBeInTheDocument();
+  });
+});
+
+describe('usePermissions Hook Convenience & Role Checks', () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it('exposes direct boolean capability flags and isRole helper', () => {
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      <AuthProvider initialRole="SERVICE_ADVISOR">{children}</AuthProvider>
+    );
+
+    const { result } = renderHook(() => usePermissions(), { wrapper });
+
+    expect(result.current.role).toBe('SERVICE_ADVISOR');
+    expect(result.current.canViewCosts).toBe(false);
+    expect(result.current.canViewGrossProfit).toBe(false);
+    expect(result.current.canManageJobCards).toBe(true);
+    expect(result.current.canAccessPos).toBe(false);
+    expect(result.current.canAccessFinance).toBe(false);
+    expect(result.current.isCostProfitVisible).toBe(false);
+
+    // Test isRole helper
+    expect(result.current.isRole('SERVICE_ADVISOR')).toBe(true);
+    expect(result.current.isRole('OWNER')).toBe(false);
+    expect(result.current.isRole(['OWNER', 'SERVICE_ADVISOR'])).toBe(true);
+    expect(result.current.isRole(['OWNER', 'WORKSHOP_MANAGER'])).toBe(false);
+  });
+
+  it('guarantees isCostProfitVisible remains false for TECHNICIAN even if setCostProfitVisible is attempted', () => {
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      <AuthProvider initialRole="TECHNICIAN">{children}</AuthProvider>
+    );
+
+    const { result } = renderHook(() => usePermissions(), { wrapper });
+
+    expect(result.current.canViewCosts).toBe(false);
+    expect(result.current.isCostProfitVisible).toBe(false);
+
+    act(() => {
+      result.current.setCostProfitVisible(true);
+    });
+
+    expect(result.current.isCostProfitVisible).toBe(false);
+
+    act(() => {
+      result.current.toggleCostProfitVisible();
+    });
+
+    expect(result.current.isCostProfitVisible).toBe(false);
   });
 });

@@ -166,6 +166,101 @@ describe('Application Shell & Navigation Layout', () => {
     expect(screen.getByTestId('not-found-page')).toBeInTheDocument();
     expect(screen.getByText('404 - Page Not Found')).toBeInTheDocument();
   });
+
+  it('handles mobile drawer opening, backdrop click, close button, and Escape key', () => {
+    renderTestApp(['/'], 'OWNER');
+
+    // Initially mobile overlay should not be in document
+    expect(screen.queryByTestId('mobile-overlay-backdrop')).not.toBeInTheDocument();
+
+    // Click mobile menu trigger
+    const menuBtn = screen.getByTestId('mobile-menu-trigger');
+    fireEvent.click(menuBtn);
+
+    // Mobile drawer and backdrop should be open
+    expect(screen.getByTestId('mobile-overlay-backdrop')).toBeInTheDocument();
+    expect(screen.getByTestId('close-mobile-nav')).toBeInTheDocument();
+    expect(screen.getByTestId('mobile-sidebar')).toBeInTheDocument();
+
+    // Close via close button
+    fireEvent.click(screen.getByTestId('close-mobile-nav'));
+    expect(screen.queryByTestId('mobile-overlay-backdrop')).not.toBeInTheDocument();
+
+    // Re-open and close via backdrop click
+    fireEvent.click(menuBtn);
+    expect(screen.getByTestId('mobile-overlay-backdrop')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('mobile-overlay-backdrop'));
+    expect(screen.queryByTestId('mobile-overlay-backdrop')).not.toBeInTheDocument();
+
+    // Re-open and close via Escape key
+    fireEvent.click(menuBtn);
+    expect(screen.getByTestId('mobile-overlay-backdrop')).toBeInTheDocument();
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(screen.queryByTestId('mobile-overlay-backdrop')).not.toBeInTheDocument();
+  });
+
+  it('focuses global search input on Cmd+K / Ctrl+K keyboard shortcut', () => {
+    renderTestApp(['/'], 'OWNER');
+
+    const searchInput = screen.getByTestId('global-search-input');
+    expect(document.activeElement).not.toBe(searchInput);
+
+    // Press Cmd+K
+    fireEvent.keyDown(window, { key: 'k', metaKey: true });
+    expect(document.activeElement).toBe(searchInput);
+  });
+
+  it('clicking brand identity navigates to dashboard home', () => {
+    renderTestApp(['/workshop/jobs'], 'OWNER');
+
+    expect(screen.getByTestId('workshop-jobs-page')).toBeInTheDocument();
+
+    const brandLink = screen.getByTestId('sidebar-brand-link');
+    fireEvent.click(brandLink);
+
+    expect(screen.getByTestId('role-dashboard')).toBeInTheDocument();
+  });
+});
+
+describe('Role Specific Dashboard Views', () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it('renders executive sales and profit metrics for OWNER', () => {
+    renderTestApp(['/'], 'OWNER');
+    expect(screen.getByTestId('dashboard-owner-view')).toBeInTheDocument();
+    expect(screen.getByText("Today's Gross Sales")).toBeInTheDocument();
+  });
+
+  it('renders executive overview for WORKSHOP_MANAGER', () => {
+    renderTestApp(['/'], 'WORKSHOP_MANAGER');
+    expect(screen.getByTestId('dashboard-owner-view')).toBeInTheDocument();
+  });
+
+  it('renders insurance claims and intake queue for SERVICE_ADVISOR', () => {
+    renderTestApp(['/'], 'SERVICE_ADVISOR');
+    expect(screen.getByTestId('dashboard-advisor-view')).toBeInTheDocument();
+    expect(screen.getByText('Estimates Pending Insurance')).toBeInTheDocument();
+    expect(screen.getByText('Service Advisor Quick Intake')).toBeInTheDocument();
+  });
+
+  it('renders register drawer and POS sales for CASHIER', () => {
+    renderTestApp(['/'], 'CASHIER');
+    expect(screen.getByTestId('dashboard-cashier-view')).toBeInTheDocument();
+    expect(screen.getByText('Active Register Drawer')).toBeInTheDocument();
+    expect(screen.getByText("Today's Counter POS Sales")).toBeInTheDocument();
+  });
+
+  it('renders assigned floor checklist for TECHNICIAN with zero costs visible', () => {
+    renderTestApp(['/'], 'TECHNICIAN');
+    expect(screen.getByTestId('dashboard-technician-view')).toBeInTheDocument();
+    expect(screen.getByText('Floor Mechanic Tasks & Checklists')).toBeInTheDocument();
+    // Invariant: no profit or cost metrics on technician dashboard
+    expect(screen.queryByText("Today's Gross Sales")).not.toBeInTheDocument();
+    expect(screen.queryByText('Direct Buying Costs')).not.toBeInTheDocument();
+    expect(screen.queryByText('Gross Profit & Margin')).not.toBeInTheDocument();
+  });
 });
 
 describe('Protected Routes & Permission Enforcements', () => {
@@ -200,6 +295,16 @@ describe('Protected Routes & Permission Enforcements', () => {
 
     expect(screen.queryByTestId('pos-terminal-page')).not.toBeInTheDocument();
     expect(screen.getByText('Access Restricted')).toBeInTheDocument();
+  });
+
+  it('BLOCKS TECHNICIAN from accessing Catalog (/catalog) and allows OWNER', () => {
+    renderTestApp(['/catalog'], 'TECHNICIAN');
+    expect(screen.queryByTestId('catalog-list-page')).not.toBeInTheDocument();
+    expect(screen.getByText('Access Restricted')).toBeInTheDocument();
+
+    const switchOwnerBtn = screen.getByText('Switch to OWNER');
+    fireEvent.click(switchOwnerBtn);
+    expect(screen.getByTestId('catalog-list-page')).toBeInTheDocument();
   });
 
   it('allows quick role elevation from Access Restricted screen for dev testing', () => {
