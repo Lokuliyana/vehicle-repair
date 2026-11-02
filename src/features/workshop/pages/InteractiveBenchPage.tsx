@@ -7,6 +7,7 @@ import {
   ShieldCheck,
   Lock,
   Plus,
+  Package,
 } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import {
@@ -14,9 +15,14 @@ import {
   WorkshopLineItem,
   DocumentStage,
   PosSaleReceipt,
+  CatalogItem,
+  RepairLineCategory,
 } from '@/types';
 import { calculateWorkshopFinancials, formatRs } from '@/utils/currency';
 import { useAuth } from '@/app/providers/AuthProvider';
+import { VehicleLookupInput } from '../components/VehicleLookupInput';
+import { VehicleHistoricalRecord } from '../types';
+import { CatalogCombobox } from '@/features/catalog/components/CatalogCombobox';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -239,6 +245,91 @@ export function InteractiveBenchPage() {
     }));
   };
 
+  const handleVehiclePopulate = (record: VehicleHistoricalRecord) => {
+    setJobSheet((prev) => ({
+      ...prev,
+      header: {
+        ...prev.header,
+        vehicleNumber: record.vehicleNumber,
+        vehicleMake: record.vehicleMake,
+        vehicleModel: record.vehicleModel,
+        yearOfMake: record.yearOfMake,
+        vehicleColor: record.vehicleColor,
+        chassisNumber: record.chassisNumber,
+        insuranceName: record.insuranceName,
+        customerInfo: record.customerInfo,
+      },
+    }));
+    toast({
+      title: 'Vehicle History Auto-Filled',
+      message: `Populated records for ${record.vehicleNumber} (${record.vehicleMake} ${record.vehicleModel})`,
+      type: 'success',
+    });
+  };
+
+  const handleHeaderFieldChange = (
+    field: keyof typeof jobSheet.header,
+    value: string
+  ) => {
+    setJobSheet((prev) => ({
+      ...prev,
+      header: {
+        ...prev.header,
+        [field]: value,
+      },
+    }));
+  };
+
+  const handleCatalogItemSelect = (item: CatalogItem) => {
+    let category: RepairLineCategory = 'REPLACEMENT';
+    if (item.itemType === 'LABOR_REMOVE_REASSEMBLE') {
+      category = 'LABOR_REMOVE_REASSEMBLE';
+    } else if (item.itemType === 'LABOR_REPAIR') {
+      category = 'LABOR_REPAIR';
+    }
+
+    const existingInCat = jobSheet.lines.filter((l) => l.category === category);
+    const newLine: WorkshopLineItem = {
+      id: `line-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      rowNo: existingInCat.length + 1,
+      category,
+      catalogItemId: item.id,
+      description: item.name + (item.vehicleCompatibility ? ` (${item.vehicleCompatibility})` : ''),
+      sellingPriceRs: item.sellingPriceRs,
+      buyingCostRs: item.buyingCostRs,
+      isCompleted: false,
+      assignedTechnician: '',
+    };
+
+    handleLinesChange([...jobSheet.lines, newLine]);
+    toast({
+      title: 'Item Added from Catalog',
+      message: `Added "${item.name}" to ${category.replace(/_/g, ' ')}`,
+      type: 'success',
+    });
+  };
+
+  const handleCustomItemAdd = (customText: string) => {
+    const existingInCat = jobSheet.lines.filter((l) => l.category === 'REPLACEMENT');
+    const newLine: WorkshopLineItem = {
+      id: `line-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      rowNo: existingInCat.length + 1,
+      category: 'REPLACEMENT',
+      description: customText,
+      sellingPriceRs: 0,
+      buyingCostRs: 0,
+      isCompleted: false,
+      assignedTechnician: '',
+    };
+
+    handleLinesChange([...jobSheet.lines, newLine]);
+    toast({
+      title: 'Custom Item Added',
+      message: `Added "${customText}" to Replacement Parts`,
+      type: 'info',
+    });
+  };
+
   const handlePrint = () => {
     window.print();
   };
@@ -456,6 +547,167 @@ export function InteractiveBenchPage() {
                   data-testid="summary-advance-input"
                 />
               </div>
+            </div>
+          </div>
+
+          {/* Exact 12-Field Manual Intake Header Grid with Smart Vehicle Lookup */}
+          <div className="bg-white rounded-lg border border-slate-200 p-4 mb-6 shadow-xs space-y-3">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+              <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                <span>Vehicle & Customer Intake (Zero CRM Friction)</span>
+              </h3>
+              <span className="text-[11px] text-slate-500">
+                Type vehicle plate to auto-populate from past repair history
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+              <div>
+                <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">
+                  Vehicle Number *
+                </label>
+                <VehicleLookupInput
+                  value={jobSheet.header.vehicleNumber}
+                  onChange={(val) => handleHeaderFieldChange('vehicleNumber', val)}
+                  onPopulate={handleVehiclePopulate}
+                  placeholder="e.g. CBA-1234"
+                  data-testid="header-vehicle-number-input"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">
+                  Vehicle Make
+                </label>
+                <Input
+                  value={jobSheet.header.vehicleMake}
+                  onChange={(e) => handleHeaderFieldChange('vehicleMake', e.target.value)}
+                  placeholder="e.g. Toyota"
+                  className="h-9 text-xs"
+                  data-testid="header-vehicle-make-input"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">
+                  Vehicle Model
+                </label>
+                <Input
+                  value={jobSheet.header.vehicleModel}
+                  onChange={(e) => handleHeaderFieldChange('vehicleModel', e.target.value)}
+                  placeholder="e.g. Corolla Axio"
+                  className="h-9 text-xs"
+                  data-testid="header-vehicle-model-input"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">
+                  Year of Make
+                </label>
+                <Input
+                  value={jobSheet.header.yearOfMake}
+                  onChange={(e) => handleHeaderFieldChange('yearOfMake', e.target.value)}
+                  placeholder="e.g. 2018"
+                  className="h-9 text-xs font-mono"
+                  data-testid="header-year-input"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">
+                  Vehicle Color
+                </label>
+                <Input
+                  value={jobSheet.header.vehicleColor}
+                  onChange={(e) => handleHeaderFieldChange('vehicleColor', e.target.value)}
+                  placeholder="e.g. Pearl White"
+                  className="h-9 text-xs"
+                  data-testid="header-color-input"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">
+                  Chassis Number
+                </label>
+                <Input
+                  value={jobSheet.header.chassisNumber}
+                  onChange={(e) => handleHeaderFieldChange('chassisNumber', e.target.value.toUpperCase())}
+                  placeholder="e.g. NZE161-1234567"
+                  className="h-9 text-xs font-mono uppercase"
+                  data-testid="header-chassis-input"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">
+                  Days For Completion
+                </label>
+                <Input
+                  value={jobSheet.header.daysForCompletion}
+                  onChange={(e) => handleHeaderFieldChange('daysForCompletion', e.target.value)}
+                  placeholder="e.g. 4 Days"
+                  className="h-9 text-xs"
+                  data-testid="header-days-input"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">
+                  Nature of Repair
+                </label>
+                <Input
+                  value={jobSheet.header.natureOfRepair}
+                  onChange={(e) => handleHeaderFieldChange('natureOfRepair', e.target.value)}
+                  placeholder="e.g. Accident Damage / Bumper Repair"
+                  className="h-9 text-xs"
+                  data-testid="header-nature-input"
+                />
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">
+                  Name of Insurance
+                </label>
+                <Input
+                  value={jobSheet.header.insuranceName}
+                  onChange={(e) => handleHeaderFieldChange('insuranceName', e.target.value)}
+                  placeholder="e.g. Sri Lanka Insurance Corporation (SLIC)"
+                  className="h-9 text-xs"
+                  data-testid="header-insurance-input"
+                />
+              </div>
+
+              <div className="sm:col-span-2">
+                <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">
+                  Customer Information (Name, Phone, Address)
+                </label>
+                <Input
+                  value={jobSheet.header.customerInfo}
+                  onChange={(e) => handleHeaderFieldChange('customerInfo', e.target.value)}
+                  placeholder="e.g. Nimal Perera - 077 123 4567 / Colombo 09"
+                  className="h-9 text-xs"
+                  data-testid="header-customer-input"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Quick Insert from Catalog Combobox */}
+          <div className="bg-amber-50/60 rounded-lg border border-amber-200 p-3 mb-6 shadow-xs flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+            <div className="shrink-0 flex items-center gap-2">
+              <Package className="w-4 h-4 text-amber-700" />
+              <span className="text-xs font-bold text-amber-950 uppercase tracking-wider">
+                Quick Insert from Catalog:
+              </span>
+            </div>
+            <div className="flex-1">
+              <CatalogCombobox
+                onSelect={handleCatalogItemSelect}
+                onSelectCustom={handleCustomItemAdd}
+                placeholder="Search catalog parts, fluids, or labor presets to add row..."
+              />
             </div>
           </div>
 

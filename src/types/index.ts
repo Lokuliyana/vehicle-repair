@@ -33,6 +33,8 @@ export type UserRole =
   | 'TECHNICIAN';
 
 export * from './auth';
+export * from '@/features/catalog/types';
+export * from '@/features/workshop/types';
 
 export interface WorkshopHeaderMetadata {
   date: string;
