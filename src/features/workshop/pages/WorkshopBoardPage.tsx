@@ -357,6 +357,22 @@ export function WorkshopBoardPage() {
                               {job.docStage}
                             </Badge>
 
+                            {!isTechnician && (
+                              <Badge
+                                variant={
+                                  job.paymentStatus === 'PAID'
+                                    ? 'success'
+                                    : job.paymentStatus === 'PARTIALLY_PAID'
+                                    ? 'warning'
+                                    : 'destructive'
+                                }
+                                className="text-[8px] font-bold uppercase tracking-wider"
+                                data-testid={`board-card-payment-status-${job.id}`}
+                              >
+                                {job.paymentStatus || 'UNPAID'}
+                              </Badge>
+                            )}
+
                             {/* Monetary Figure - STRICTLY REDACTED for TECHNICIAN */}
                             {!isTechnician && (
                               <span

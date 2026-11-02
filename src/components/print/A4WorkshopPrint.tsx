@@ -65,6 +65,17 @@ export const A4WorkshopPrint = React.forwardRef<HTMLDivElement, A4WorkshopPrintP
             <h2 className="text-sm font-bold border border-black px-3 py-1 bg-gray-100 uppercase inline-block">
               {getStageTitle()}
             </h2>
+            {docStage === 'INVOICE' && (
+              <div className="text-[9px] font-bold tracking-wider text-black mt-0.5 uppercase">
+                {financials.insuranceApprovedRs > 0 ||
+                (header.insuranceName &&
+                  !['direct cash customer', 'none / direct customer', 'none', 'direct customer', 'n/a', '-'].includes(
+                    header.insuranceName.toLowerCase().trim()
+                  ))
+                  ? 'ACCIDENT REPAIR INVOICE'
+                  : 'FINAL INVOICE'}
+              </div>
+            )}
           </div>
         </div>
 
@@ -361,10 +372,47 @@ export const A4WorkshopPrint = React.forwardRef<HTMLDivElement, A4WorkshopPrintP
           </table>
         </div>
 
-        {/* Financial Summary Box (Redacted completely on Job Card) */}
+        {/* Payment History & Financial Summary Box (Redacted on Job Card) */}
         {!isJobCard && (
-          <div className="flex justify-end mb-6">
-            <div className="w-72 border border-black text-[11px]">
+          <div className="mb-6 space-y-4">
+            {jobSheet.payments && jobSheet.payments.length > 0 && (
+              <div data-testid="a4-payment-receipts-table">
+                <div className="bg-gray-200 border-x border-t border-black px-2 py-1 font-bold text-[10px] uppercase">
+                  Itemized Payment Receipts & Settlement History
+                </div>
+                <table className="w-full border-collapse border border-black text-[10px]">
+                  <thead>
+                    <tr className="bg-gray-50 border-b border-black text-[9.5px]">
+                      <th className="p-1 border-r border-black text-left font-bold w-24">Receipt #</th>
+                      <th className="p-1 border-r border-black text-left font-bold w-20">Date</th>
+                      <th className="p-1 border-r border-black text-left font-bold">Category</th>
+                      <th className="p-1 border-r border-black text-left font-bold">Method</th>
+                      <th className="p-1 border-r border-black text-left font-bold">Ref / Cheque #</th>
+                      <th className="p-1 border-r border-black text-right font-bold w-24">Amount Paid</th>
+                      <th className="p-1 text-right font-bold w-24">Balance</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {jobSheet.payments.map((p) => (
+                      <tr key={p.id} className="border-b border-black text-[9.5px]">
+                        <td className="p-1 border-r border-black font-mono font-bold">{p.receiptNumber}</td>
+                        <td className="p-1 border-r border-black">{p.date}</td>
+                        <td className="p-1 border-r border-black capitalize">
+                          {p.paymentType.toLowerCase().replace('_', ' ')}
+                        </td>
+                        <td className="p-1 border-r border-black font-semibold">{p.paymentMethod}</td>
+                        <td className="p-1 border-r border-black font-mono">{p.referenceNumber || '-'}</td>
+                        <td className="p-1 border-r border-black text-right font-bold">{formatRs(p.amountRs)}</td>
+                        <td className="p-1 text-right">{formatRs(p.balanceAfterRs)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            <div className="flex justify-end">
+              <div className="w-72 border border-black text-[11px]">
               <div className="flex justify-between p-1.5 border-b border-black">
                 <span className="font-semibold">Gross Total:</span>
                 <span>
@@ -422,7 +470,8 @@ export const A4WorkshopPrint = React.forwardRef<HTMLDivElement, A4WorkshopPrintP
                 )}
             </div>
           </div>
-        )}
+        </div>
+      )}
 
         {/* Signatures & Job Card Floor Section */}
         {isJobCard && (

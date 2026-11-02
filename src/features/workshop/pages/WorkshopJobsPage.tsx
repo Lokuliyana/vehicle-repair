@@ -11,6 +11,8 @@ import {
   RefreshCw,
   Car,
   CheckCircle2,
+  FileCheck,
+  CreditCard,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -30,9 +32,10 @@ import {
   AuditLogEntry,
 } from '@/types';
 import { useAuth } from '@/app/providers/AuthProvider';
-import { formatRs } from '@/utils/currency';
+import { formatRs, determineWorkshopPaymentStatus } from '@/utils/currency';
 import { workshopJobRepository } from '../repository/workshop-job.repository.mock';
 import { A4WorkshopPrint } from '@/components/print/A4WorkshopPrint';
+import { PaymentCollectionModal } from '../components/PaymentCollectionModal';
 import { buildWhatsAppShareUrl } from '@/utils/whatsapp';
 import { cn } from '@/utils/cn';
 
@@ -48,6 +51,7 @@ export function WorkshopJobsPage() {
 
   const [revision, setRevision] = useState(0);
   const [activePrintJob, setActivePrintJob] = useState<WorkshopJobSheet | null>(null);
+  const [activePaymentJob, setActivePaymentJob] = useState<WorkshopJobSheet | null>(null);
 
   // Sync search param when URL queryParam changes
   useEffect(() => {
@@ -162,6 +166,75 @@ export function WorkshopJobsPage() {
       toast({
         title: 'Conversion Failed',
         message: 'Could not convert job to Job Card.',
+        type: 'error',
+      });
+    }
+  };
+
+  const handleConvertToInvoice = async (job: WorkshopJobSheet) => {
+    try {
+      let snapshot = job.originalEstimateSnapshot;
+      if (!snapshot) {
+        const snapshotData = {
+          lines: JSON.parse(JSON.stringify(job.lines)),
+          financials: { ...job.financials },
+          grandTotalSalesRs: job.financials.grandTotalSalesRs,
+          subtotalRemoveReassembleRs: job.financials.subtotalRemoveReassembleRs,
+          subtotalRepairRs: job.financials.subtotalRepairRs,
+          subtotalReplacementRs: job.financials.subtotalReplacementRs,
+          discountRs: job.financials.discountRs || 0,
+          taxRs: job.financials.taxRs || 0,
+          frozenAt: new Date().toISOString(),
+          stage: job.docStage,
+        };
+        snapshot = JSON.stringify(snapshotData);
+      }
+
+      const currentPaymentStatus = determineWorkshopPaymentStatus({
+        grandTotalSalesRs: job.financials.grandTotalSalesRs,
+        insuranceApprovedRs: job.financials.insuranceApprovedRs,
+        advancePaidRs: job.financials.advancePaidRs,
+        balanceDueRs: job.financials.balanceDueRs,
+        payments: job.payments,
+      });
+
+      const isFullyPaid = currentPaymentStatus === 'PAID';
+      const nextFloorStatus: WorkshopFloorStatus = isFullyPaid
+        ? 'COMPLETED_DELIVERED'
+        : 'READY_FOR_DELIVERY';
+
+      const auditEntry: AuditLogEntry = {
+        id: `audit-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+        timestamp: new Date().toISOString(),
+        actor: user?.name || role,
+        action: 'STAGE_CONVERSION',
+        fromState: job.docStage,
+        toState: 'INVOICE',
+        comment: `Converted from ${job.docStage} to Final Invoice. Grand Total: Rs. ${job.financials.grandTotalSalesRs}, Balance Due: Rs. ${job.financials.balanceDueRs}.`,
+      };
+
+      const updatedLogs = [...(job.auditLogs || []), auditEntry];
+
+      await workshopJobRepository.update(job.id, {
+        docStage: 'INVOICE',
+        floorStatus: nextFloorStatus,
+        paymentStatus: currentPaymentStatus,
+        originalEstimateSnapshot: snapshot,
+        auditLogs: updatedLogs,
+      });
+
+      toast({
+        title: 'Converted to Invoice',
+        message: `${job.jobNumber} successfully converted to Final Invoice.`,
+        type: 'success',
+      });
+
+      setRevision((r) => r + 1);
+    } catch (err) {
+      console.error('Invoice conversion error:', err);
+      toast({
+        title: 'Conversion Failed',
+        message: 'Could not convert job to Invoice.',
         type: 'error',
       });
     }
@@ -371,6 +444,21 @@ export function WorkshopJobsPage() {
                           {job.docStage}
                         </Badge>
                       </div>
+                      <div>
+                        <Badge
+                          variant={
+                            job.paymentStatus === 'PAID'
+                              ? 'success'
+                              : job.paymentStatus === 'PARTIALLY_PAID'
+                              ? 'warning'
+                              : 'destructive'
+                          }
+                          className="font-bold uppercase tracking-wider text-[8px]"
+                          data-testid={`payment-status-badge-${job.id}`}
+                        >
+                          {job.paymentStatus || 'UNPAID'}
+                        </Badge>
+                      </div>
                       <div className="text-[10px] text-slate-500 font-mono">
                         {job.floorStatus.replace(/_/g, ' ')}
                       </div>
@@ -397,6 +485,33 @@ export function WorkshopJobsPage() {
                           >
                             <CheckCircle2 className="w-3 h-3 text-blue-600" />
                             <span>Job Card</span>
+                          </Button>
+                        )}
+
+                        {permissions.canManageJobCards && (job.docStage === 'JOB_CARD' || job.docStage === 'ESTIMATE') && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleConvertToInvoice(job)}
+                            className="h-7 px-2 text-[10px] font-bold text-emerald-700 border-emerald-300 hover:bg-emerald-50 gap-1"
+                            title="Convert to Invoice"
+                            data-testid={`convert-invoice-btn-${job.id}`}
+                          >
+                            <FileCheck className="w-3 h-3 text-emerald-600" />
+                            <span>Invoice</span>
+                          </Button>
+                        )}
+
+                        {role !== 'TECHNICIAN' && (
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={() => setActivePaymentJob(job)}
+                            className="h-7 w-7 text-amber-700 border-amber-300 hover:bg-amber-50"
+                            title="Collect Payment"
+                            data-testid={`collect-payment-btn-${job.id}`}
+                          >
+                            <CreditCard className="w-3.5 h-3.5 text-amber-600" />
                           </Button>
                         )}
 
@@ -496,6 +611,19 @@ export function WorkshopJobsPage() {
           </div>
         )}
       </Dialog>
+
+      {/* Payment Collection Modal */}
+      {activePaymentJob && (
+        <PaymentCollectionModal
+          isOpen={activePaymentJob !== null}
+          onClose={() => setActivePaymentJob(null)}
+          job={activePaymentJob}
+          onPaymentSuccess={() => {
+            setActivePaymentJob(null);
+            setRevision((r) => r + 1);
+          }}
+        />
+      )}
     </div>
   );
 }

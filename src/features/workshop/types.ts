@@ -23,7 +23,44 @@ export type PaymentStatus =
   | 'UNPAID'
   | 'PARTIALLY_PAID'
   | 'PAID'
+  | 'REFUNDED_VOID'
   | 'VOID';
+
+export type WorkshopPaymentType =
+  | 'ADVANCE'
+  | 'CUSTOMER_EXCESS'
+  | 'INSURANCE_SETTLEMENT'
+  | 'FULL_PAYMENT';
+
+export type WorkshopPaymentMethod =
+  | 'CASH'
+  | 'CARD'
+  | 'BANK_TRANSFER'
+  | 'CHEQUE';
+
+export interface WorkshopPaymentRecord {
+  id: string;
+  receiptNumber: string;
+  date: string;
+  amountRs: number;
+  paymentType: WorkshopPaymentType;
+  paymentMethod: WorkshopPaymentMethod;
+  referenceNumber?: string;
+  notes?: string;
+  recordedBy?: string;
+  balanceAfterRs: number;
+  createdAt: string;
+}
+
+export interface RecordPaymentDto {
+  amountRs: number;
+  paymentType: WorkshopPaymentType;
+  paymentMethod: WorkshopPaymentMethod;
+  referenceNumber?: string;
+  notes?: string;
+  date?: string;
+  recordedBy?: string;
+}
 
 export interface VehicleHistoricalRecord {
   vehicleNumber: string; // e.g. 'WP CBA-1234'
@@ -118,6 +155,7 @@ export interface WorkshopJobSheet {
   lines: WorkshopLineItem[];
   financials: WorkshopFinancialSummary;
   originalEstimateSnapshot?: string;
+  payments?: WorkshopPaymentRecord[];
   auditLogs?: AuditLogEntry[];
   createdAt: string;
   updatedAt: string;
@@ -135,6 +173,7 @@ export interface CreateWorkshopJobSheetDto {
   insuranceApprovedRs?: number;
   advancePaidRs?: number;
   originalEstimateSnapshot?: string;
+  payments?: WorkshopPaymentRecord[];
   auditLogs?: AuditLogEntry[];
 }
 
@@ -150,6 +189,7 @@ export interface UpdateWorkshopJobSheetDto {
   insuranceApprovedRs?: number;
   advancePaidRs?: number;
   originalEstimateSnapshot?: string;
+  payments?: WorkshopPaymentRecord[];
   auditLogs?: AuditLogEntry[];
 }
 

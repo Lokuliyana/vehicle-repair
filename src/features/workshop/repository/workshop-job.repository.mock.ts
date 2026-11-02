@@ -3,9 +3,17 @@ import {
   CreateWorkshopJobSheetDto,
   UpdateWorkshopJobSheetDto,
   WorkshopJobFilter,
+  RecordPaymentDto,
+  WorkshopPaymentRecord,
+  AuditLogEntry,
 } from '../types';
 import { IWorkshopJobRepository } from './workshop-job.repository.interface';
-import { calculateWorkshopFinancials } from '@/utils/currency';
+import {
+  calculateWorkshopFinancials,
+  determineWorkshopPaymentStatus,
+  roundCurrency,
+  formatRs,
+} from '@/utils/currency';
 import { vehicleHistoryRepository } from './vehicle-history.repository.mock';
 
 const STORAGE_KEY = 'antigravity_workshop_jobs_v1';
@@ -562,6 +570,30 @@ export class MockWorkshopJobRepository implements IWorkshopJobRepository {
     return `JOB-${currentYear}-${String(nextSeq).padStart(4, '0')}`;
   }
 
+  async getNextReceiptNumber(): Promise<string> {
+    this.init();
+    const currentYear = new Date().getFullYear();
+    const pattern = new RegExp(`^REC-${currentYear}-(\\d{4})$`);
+
+    let maxSeq = 0;
+    for (const job of this.jobs) {
+      if (job.payments) {
+        for (const p of job.payments) {
+          const match = p.receiptNumber?.match(pattern);
+          if (match) {
+            const seq = parseInt(match[1], 10);
+            if (!isNaN(seq) && seq > maxSeq) {
+              maxSeq = seq;
+            }
+          }
+        }
+      }
+    }
+
+    const nextSeq = maxSeq + 1;
+    return `REC-${currentYear}-${String(nextSeq).padStart(4, '0')}`;
+  }
+
   async create(dto: CreateWorkshopJobSheetDto): Promise<WorkshopJobSheet> {
     this.init();
     const id = `job-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
@@ -582,12 +614,23 @@ export class MockWorkshopJobRepository implements IWorkshopJobRepository {
       dto.advancePaidRs || 0
     );
 
+    const payments = dto.payments || [];
+    const paymentStatus =
+      dto.paymentStatus ||
+      determineWorkshopPaymentStatus({
+        grandTotalSalesRs: financials.grandTotalSalesRs,
+        insuranceApprovedRs: financials.insuranceApprovedRs,
+        advancePaidRs: financials.advancePaidRs,
+        balanceDueRs: financials.balanceDueRs,
+        payments,
+      });
+
     const newJob: WorkshopJobSheet = {
       id,
       jobNumber,
       docStage: dto.docStage || 'QUOTATION',
       floorStatus: dto.floorStatus || 'DRAFT',
-      paymentStatus: dto.paymentStatus || 'UNPAID',
+      paymentStatus,
       header: {
         ...dto.header,
         jobNumber,
@@ -595,6 +638,7 @@ export class MockWorkshopJobRepository implements IWorkshopJobRepository {
       lines: dto.lines || [],
       financials,
       originalEstimateSnapshot: dto.originalEstimateSnapshot,
+      payments,
       auditLogs: dto.auditLogs || [],
       createdAt: now,
       updatedAt: now,
@@ -643,18 +687,162 @@ export class MockWorkshopJobRepository implements IWorkshopJobRepository {
       advancePaidRs
     );
 
+    const updatedPayments =
+      updates.payments !== undefined ? updates.payments : (current.payments || []);
+
+    const paymentStatus =
+      updates.paymentStatus !== undefined
+        ? updates.paymentStatus
+        : determineWorkshopPaymentStatus({
+            grandTotalSalesRs: recalculatedFinancials.grandTotalSalesRs,
+            insuranceApprovedRs: recalculatedFinancials.insuranceApprovedRs,
+            advancePaidRs: recalculatedFinancials.advancePaidRs,
+            balanceDueRs: recalculatedFinancials.balanceDueRs,
+            payments: updatedPayments,
+          });
+
     const updatedJob: WorkshopJobSheet = {
       ...current,
       jobNumber: updates.jobNumber || current.jobNumber,
       docStage: updates.docStage || current.docStage,
       floorStatus: updates.floorStatus || current.floorStatus,
-      paymentStatus: updates.paymentStatus || current.paymentStatus,
+      paymentStatus,
       header: updatedHeader,
       lines: updatedLines,
       financials: recalculatedFinancials,
       originalEstimateSnapshot:
         current.originalEstimateSnapshot || updates.originalEstimateSnapshot,
+      payments: updatedPayments,
       auditLogs: updates.auditLogs !== undefined ? updates.auditLogs : (current.auditLogs || []),
+      updatedAt: new Date().toISOString(),
+    };
+
+    this.jobs[index] = updatedJob;
+    this.saveToStorage();
+    this.syncVehicleHistory(updatedJob);
+
+    return { ...updatedJob };
+  }
+
+  async recordPayment(id: string, paymentDto: RecordPaymentDto): Promise<WorkshopJobSheet> {
+    this.init();
+    const index = this.jobs.findIndex((j) => j.id === id);
+    if (index === -1) {
+      throw new Error(`Job not found with id: ${id}`);
+    }
+
+    const job = this.jobs[index];
+    const amount = Number(paymentDto.amountRs);
+
+    if (isNaN(amount) || amount <= 0) {
+      throw new Error('Payment amount must be greater than 0');
+    }
+
+    const currentPayments = job.payments || [];
+    const isInsurancePayment = paymentDto.paymentType === 'INSURANCE_SETTLEMENT';
+
+    if (isInsurancePayment) {
+      const existingInsurancePaid = currentPayments
+        .filter((p) => p.paymentType === 'INSURANCE_SETTLEMENT')
+        .reduce((sum, p) => sum + (Number(p.amountRs) || 0), 0);
+      const pendingInsurance = Math.max(
+        0,
+        job.financials.insuranceApprovedRs - existingInsurancePaid
+      );
+
+      if (amount > pendingInsurance) {
+        throw new Error(
+          `Payment amount (${amount}) exceeds pending insurance settlement (${pendingInsurance})`
+        );
+      }
+    } else {
+      if (amount > job.financials.balanceDueRs) {
+        throw new Error(
+          `Payment amount (${amount}) exceeds customer balance due (${job.financials.balanceDueRs})`
+        );
+      }
+    }
+
+    const receiptNumber = await this.getNextReceiptNumber();
+    const date = paymentDto.date || new Date().toISOString().split('T')[0];
+
+    const newAdvancePaidRs = isInsurancePayment
+      ? job.financials.advancePaidRs
+      : roundCurrency(job.financials.advancePaidRs + amount);
+
+    const recalculatedFinancials = calculateWorkshopFinancials(
+      job.lines,
+      job.financials.discountRs,
+      job.financials.taxRs,
+      job.financials.insuranceApprovedRs,
+      newAdvancePaidRs
+    );
+
+    // For insurance settlements, balanceAfter is remaining insurance approved balance;
+    // for customer payments, it is customer balanceDueRs.
+    let balanceAfterRs: number;
+    let balanceComment: string;
+    if (isInsurancePayment) {
+      const existingInsurancePaid = currentPayments
+        .filter((p) => p.paymentType === 'INSURANCE_SETTLEMENT')
+        .reduce((sum, p) => sum + (Number(p.amountRs) || 0), 0);
+      const remainingInsurance = Math.max(
+        0,
+        roundCurrency(job.financials.insuranceApprovedRs - existingInsurancePaid - amount)
+      );
+      balanceAfterRs = remainingInsurance;
+      balanceComment = `Insurance balance remaining: ${formatRs(remainingInsurance)}`;
+    } else {
+      balanceAfterRs = recalculatedFinancials.balanceDueRs;
+      balanceComment = `Customer balance remaining: ${formatRs(recalculatedFinancials.balanceDueRs)}`;
+    }
+
+    const paymentRecord: WorkshopPaymentRecord = {
+      id: `pay-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      receiptNumber,
+      date,
+      amountRs: roundCurrency(amount),
+      paymentType: paymentDto.paymentType,
+      paymentMethod: paymentDto.paymentMethod,
+      referenceNumber: paymentDto.referenceNumber,
+      notes: paymentDto.notes,
+      recordedBy: paymentDto.recordedBy || 'Cashier',
+      balanceAfterRs,
+      createdAt: new Date().toISOString(),
+    };
+
+    const updatedPayments = [...currentPayments, paymentRecord];
+
+    const newPaymentStatus = determineWorkshopPaymentStatus({
+      grandTotalSalesRs: recalculatedFinancials.grandTotalSalesRs,
+      insuranceApprovedRs: recalculatedFinancials.insuranceApprovedRs,
+      advancePaidRs: recalculatedFinancials.advancePaidRs,
+      balanceDueRs: recalculatedFinancials.balanceDueRs,
+      payments: updatedPayments,
+    });
+
+    let newFloorStatus = job.floorStatus;
+    if (job.docStage === 'INVOICE' && newPaymentStatus === 'PAID') {
+      newFloorStatus = 'COMPLETED_DELIVERED';
+    }
+
+    const auditEntry: AuditLogEntry = {
+      id: `audit-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      timestamp: new Date().toISOString(),
+      actor: paymentDto.recordedBy || 'Cashier',
+      action: 'PAYMENT_COLLECTED',
+      fromState: job.paymentStatus,
+      toState: newPaymentStatus,
+      comment: `Payment collected: ${formatRs(amount)} via ${paymentDto.paymentMethod} (${paymentDto.paymentType}). Receipt: ${receiptNumber}. ${balanceComment}.`,
+    };
+
+    const updatedJob: WorkshopJobSheet = {
+      ...job,
+      floorStatus: newFloorStatus,
+      paymentStatus: newPaymentStatus,
+      financials: recalculatedFinancials,
+      payments: updatedPayments,
+      auditLogs: [...(job.auditLogs || []), auditEntry],
       updatedAt: new Date().toISOString(),
     };
 

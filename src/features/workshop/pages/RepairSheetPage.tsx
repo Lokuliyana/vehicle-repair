@@ -12,6 +12,9 @@ import {
   Shield,
   Clock,
   CheckCircle2,
+  FileCheck,
+  CreditCard,
+  Receipt,
 } from 'lucide-react';
 import {
   WorkshopJobSheet,
@@ -22,14 +25,22 @@ import {
   CatalogItem,
   VehicleHistoricalRecord,
   AuditLogEntry,
+  WorkshopPaymentRecord,
+  PaymentStatus,
 } from '@/types';
-import { calculateWorkshopFinancials, formatRs } from '@/utils/currency';
+import {
+  calculateWorkshopFinancials,
+  determineWorkshopPaymentStatus,
+  formatRs,
+} from '@/utils/currency';
 import { useAuth } from '@/app/providers/AuthProvider';
 import { workshopJobRepository } from '../repository/workshop-job.repository.mock';
 import { WorkshopTable } from '@/components/workshop/WorkshopTable';
 import { VehicleLookupInput } from '../components/VehicleLookupInput';
 import { CatalogCombobox } from '@/features/catalog/components/CatalogCombobox';
 import { A4WorkshopPrint } from '@/components/print/A4WorkshopPrint';
+import { WorkshopPaymentThermalReceipt } from '@/components/print/WorkshopPaymentThermalReceipt';
+import { PaymentCollectionModal } from '../components/PaymentCollectionModal';
 import { buildWhatsAppShareUrl } from '@/utils/whatsapp';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -97,6 +108,11 @@ export function RepairSheetPage() {
   const [taxRs, setTaxRs] = useState<number>(0);
   const [insuranceApprovedRs, setInsuranceApprovedRs] = useState<number>(0);
   const [advancePaidRs, setAdvancePaidRs] = useState<number>(0);
+  const [, setPaymentStatus] = useState<PaymentStatus>('UNPAID');
+  const [payments, setPayments] = useState<WorkshopPaymentRecord[]>([]);
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [activeThermalPayment, setActiveThermalPayment] =
+    useState<WorkshopPaymentRecord | null>(null);
   const [originalSnapshot, setOriginalSnapshot] = useState<string | undefined>();
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
 
@@ -114,6 +130,8 @@ export function RepairSheetPage() {
             setJobNumber(existing.jobNumber);
             setDocStage(existing.docStage);
             setFloorStatus(existing.floorStatus);
+            setPaymentStatus(existing.paymentStatus || 'UNPAID');
+            setPayments(existing.payments || []);
             setDate(existing.header.date);
             setVehicleNumber(existing.header.vehicleNumber || '');
             setNatureOfRepair(existing.header.natureOfRepair || '');
@@ -144,6 +162,8 @@ export function RepairSheetPage() {
           setJobNumber(nextJobNo);
           setDocStage('QUOTATION');
           setFloorStatus('DRAFT');
+          setPaymentStatus('UNPAID');
+          setPayments([]);
           setDate(new Date().toISOString().split('T')[0]);
           setVehicleNumber('');
           setNatureOfRepair('');
@@ -194,6 +214,16 @@ export function RepairSheetPage() {
       advancePaidRs
     );
   }, [lines, discountRs, taxRs, insuranceApprovedRs, advancePaidRs]);
+
+  const dynamicPaymentStatus = useMemo(() => {
+    return determineWorkshopPaymentStatus({
+      grandTotalSalesRs: financials.grandTotalSalesRs,
+      insuranceApprovedRs: financials.insuranceApprovedRs,
+      advancePaidRs: financials.advancePaidRs,
+      balanceDueRs: financials.balanceDueRs,
+      payments,
+    });
+  }, [financials, payments]);
 
   // Auto-populate from vehicle lookup history
   const handleVehiclePopulate = (record: VehicleHistoricalRecord) => {
@@ -373,19 +403,120 @@ export function RepairSheetPage() {
     });
   };
 
-  // Convert Document Stage
-  const handleStageTransition = (newStage: DocumentStage) => {
-    if (newStage === docStage) return;
+  // 1-Click Conversion to Final Invoice
+  const handleConvertToInvoice = async () => {
+    if (docStage === 'INVOICE') return;
 
-    // Snapshot locking rule for Estimate / Quotation -> Job Card
     let snapshot = originalSnapshot;
-    if ((docStage === 'ESTIMATE' || docStage === 'QUOTATION') && newStage === 'JOB_CARD' && !originalSnapshot) {
+    // If not already snapshot frozen (e.g. from ESTIMATE directly), freeze baseline estimate
+    if (!snapshot) {
       const snapshotData = {
         id: currentId || 'temp-id',
         jobNumber,
         docStage,
         floorStatus,
-        paymentStatus: 'UNPAID' as const,
+        paymentStatus: dynamicPaymentStatus,
+        header: {
+          date,
+          jobNumber,
+          vehicleNumber,
+          natureOfRepair,
+          vehicleMake,
+          chassisNumber,
+          vehicleModel,
+          daysForCompletion,
+          yearOfMake,
+          vehicleColor,
+          insuranceName,
+          customerInfo,
+        },
+        lines: JSON.parse(JSON.stringify(lines)),
+        financials: { ...financials },
+        subtotalRemoveReassembleRs: financials.subtotalRemoveReassembleRs,
+        subtotalRepairRs: financials.subtotalRepairRs,
+        subtotalReplacementRs: financials.subtotalReplacementRs,
+        grandTotalSalesRs: financials.grandTotalSalesRs,
+        discountRs,
+        taxRs,
+        frozenAt: new Date().toISOString(),
+        stage: docStage,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      snapshot = JSON.stringify(snapshotData);
+      setOriginalSnapshot(snapshot);
+    }
+
+    const nextFloorStatus: WorkshopFloorStatus =
+      dynamicPaymentStatus === 'PAID' ? 'COMPLETED_DELIVERED' : 'READY_FOR_DELIVERY';
+
+    const auditEntry: AuditLogEntry = {
+      id: `audit-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      timestamp: new Date().toISOString(),
+      actor: user?.name || role,
+      action: 'STAGE_CONVERSION',
+      fromState: docStage,
+      toState: 'INVOICE',
+      comment: `1-Click conversion from ${docStage} to Final Invoice. Grand Total: Rs. ${financials.grandTotalSalesRs}, Balance Due: Rs. ${financials.balanceDueRs}.`,
+    };
+
+    const updatedLogs = [...auditLogs, auditEntry];
+    setAuditLogs(updatedLogs);
+    setDocStage('INVOICE');
+    setFloorStatus(nextFloorStatus);
+    setPaymentStatus(dynamicPaymentStatus);
+
+    if (currentId) {
+      try {
+        await workshopJobRepository.update(currentId, {
+          docStage: 'INVOICE',
+          floorStatus: nextFloorStatus,
+          paymentStatus: dynamicPaymentStatus,
+          originalEstimateSnapshot: snapshot,
+          auditLogs: updatedLogs,
+        });
+      } catch (err) {
+        console.error('Failed to sync invoice conversion to repository:', err);
+      }
+    }
+
+    toast({
+      title: 'Converted to Invoice',
+      message: `Document transitioned to Final Invoice. Floor status set to ${nextFloorStatus.replace(/_/g, ' ')}.`,
+      type: 'success',
+    });
+  };
+
+  const handlePaymentSuccess = (
+    updatedJob: WorkshopJobSheet,
+    paymentRecord: WorkshopPaymentRecord
+  ) => {
+    setAdvancePaidRs(updatedJob.financials.advancePaidRs);
+    setPayments(updatedJob.payments || []);
+    setPaymentStatus(updatedJob.paymentStatus);
+    setFloorStatus(updatedJob.floorStatus);
+    setAuditLogs(updatedJob.auditLogs || []);
+    setActiveThermalPayment(paymentRecord);
+  };
+
+  // Convert Document Stage
+  const handleStageTransition = (newStage: DocumentStage) => {
+    if (newStage === docStage) return;
+
+    // Snapshot locking rule for Estimate / Quotation -> Job Card or Invoice
+    let snapshot = originalSnapshot;
+    const shouldFreezeSnapshot =
+      (docStage === 'ESTIMATE' || docStage === 'QUOTATION') &&
+      (newStage === 'JOB_CARD' || newStage === 'INVOICE') &&
+      !originalSnapshot;
+
+    if (shouldFreezeSnapshot) {
+      const snapshotData = {
+        id: currentId || 'temp-id',
+        jobNumber,
+        docStage,
+        floorStatus,
+        paymentStatus: dynamicPaymentStatus,
         header: {
           date,
           jobNumber,
@@ -425,7 +556,7 @@ export function RepairSheetPage() {
       fromState: docStage,
       toState: newStage,
       comment: `Document stage converted from ${docStage} to ${newStage}.${
-        newStage === 'JOB_CARD' ? ' Baseline estimate snapshot frozen.' : ''
+        shouldFreezeSnapshot ? ' Baseline estimate snapshot frozen.' : ''
       }`,
     };
     setAuditLogs((prev) => [...prev, auditEntry]);
@@ -435,8 +566,9 @@ export function RepairSheetPage() {
     // Contextual floor status adjustment
     if (newStage === 'JOB_CARD' && (floorStatus === 'DRAFT' || floorStatus === 'PENDING_INSURANCE_APPROVAL')) {
       setFloorStatus('APPROVED_IN_PROGRESS');
-    } else if (newStage === 'INVOICE' && floorStatus !== 'COMPLETED_DELIVERED') {
-      setFloorStatus('READY_FOR_DELIVERY');
+    } else if (newStage === 'INVOICE') {
+      const isPaid = dynamicPaymentStatus === 'PAID';
+      setFloorStatus(isPaid ? 'COMPLETED_DELIVERED' : 'READY_FOR_DELIVERY');
     }
 
     toast({
@@ -480,12 +612,14 @@ export function RepairSheetPage() {
           jobNumber,
           docStage,
           floorStatus,
+          paymentStatus: dynamicPaymentStatus,
           header,
           lines,
           discountRs,
           taxRs,
           insuranceApprovedRs,
           advancePaidRs,
+          payments,
           originalEstimateSnapshot: originalSnapshot,
           auditLogs,
         });
@@ -501,13 +635,14 @@ export function RepairSheetPage() {
           jobNumber,
           docStage,
           floorStatus,
-          paymentStatus: 'UNPAID',
+          paymentStatus: dynamicPaymentStatus,
           header,
           lines,
           discountRs,
           taxRs,
           insuranceApprovedRs,
           advancePaidRs,
+          payments,
           originalEstimateSnapshot: originalSnapshot,
           auditLogs,
         });
@@ -539,7 +674,8 @@ export function RepairSheetPage() {
       jobNumber: jobNumber || 'DRAFT',
       docStage,
       floorStatus,
-      paymentStatus: financials.balanceDueRs <= 0 ? 'PAID' : 'UNPAID',
+      paymentStatus: dynamicPaymentStatus,
+      payments,
       header: {
         date,
         jobNumber: jobNumber || 'DRAFT',
@@ -642,6 +778,19 @@ export function RepairSheetPage() {
               >
                 {docStage}
               </Badge>
+              <Badge
+                variant={
+                  dynamicPaymentStatus === 'PAID'
+                    ? 'success'
+                    : dynamicPaymentStatus === 'PARTIALLY_PAID'
+                    ? 'warning'
+                    : 'destructive'
+                }
+                className="font-bold uppercase tracking-wider text-[10px]"
+                data-testid="sheet-payment-status-badge"
+              >
+                {dynamicPaymentStatus}
+              </Badge>
             </div>
             <p className="text-xs text-slate-500">
               Zero-CRM high-speed collision estimation & workshop billing
@@ -663,6 +812,36 @@ export function RepairSheetPage() {
             >
               <CheckCircle2 className="w-3.5 h-3.5" />
               <span>Convert to Job Card</span>
+            </Button>
+          )}
+
+          {/* 1-Click Conversion to Invoice button (Authorized Roles Only) */}
+          {role !== 'TECHNICIAN' && permissions.canManageJobCards && (docStage === 'JOB_CARD' || docStage === 'ESTIMATE') && (
+            <Button
+              type="button"
+              variant="default"
+              size="sm"
+              onClick={handleConvertToInvoice}
+              className="text-xs h-8 bg-emerald-600 hover:bg-emerald-700 text-white font-bold gap-1.5 shadow-xs"
+              data-testid="convert-to-invoice-btn"
+            >
+              <FileCheck className="w-3.5 h-3.5" />
+              <span>Convert to Invoice</span>
+            </Button>
+          )}
+
+          {/* Payment Collection Button (Authorized Roles Only) */}
+          {role !== 'TECHNICIAN' && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setIsPaymentModalOpen(true)}
+              className="text-xs h-8 bg-amber-50 hover:bg-amber-100 text-amber-900 border-amber-300 font-bold gap-1.5 shadow-xs"
+              data-testid="collect-payment-btn"
+            >
+              <CreditCard className="w-3.5 h-3.5 text-amber-700" />
+              <span>Collect Payment</span>
             </Button>
           )}
 
@@ -1215,9 +1394,19 @@ export function RepairSheetPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-[11px] font-medium text-slate-600">
-                      Balance Due:
-                    </label>
+                    <div className="flex items-center justify-between">
+                      <label className="block text-[11px] font-medium text-slate-600">
+                        Balance Due:
+                      </label>
+                        <button
+                          type="button"
+                          onClick={() => setIsPaymentModalOpen(true)}
+                          className="text-[10px] font-bold text-emerald-700 hover:text-emerald-900 underline cursor-pointer"
+                          data-testid="quick-collect-payment-btn"
+                        >
+                          Collect
+                        </button>
+                    </div>
                     <div
                       className={cn(
                         'h-8 px-2 flex items-center justify-end rounded border font-black',
@@ -1232,6 +1421,82 @@ export function RepairSheetPage() {
                   </div>
                 </div>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Payment History Card (Visible if any payments recorded) */}
+        {payments.length > 0 && (
+          <div
+            className="bg-white rounded-xl border border-slate-200 p-5 shadow-xs space-y-3"
+            data-testid="workshop-payments-history-panel"
+          >
+            <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+                <Receipt className="w-4 h-4 text-emerald-600" />
+                Recorded Payment Receipts ({payments.length})
+              </h3>
+              {role !== 'TECHNICIAN' && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsPaymentModalOpen(true)}
+                  className="text-[11px] h-7 px-2 border-emerald-300 text-emerald-800 hover:bg-emerald-50 font-bold gap-1"
+                  data-testid="history-collect-payment-btn"
+                >
+                  <CreditCard className="w-3 h-3" />
+                  <span>Collect Payment</span>
+                </Button>
+              )}
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs text-left border-collapse">
+                <thead>
+                  <tr className="border-b border-slate-200 bg-slate-50 text-[10px] uppercase font-bold text-slate-600">
+                    <th className="p-2">Receipt #</th>
+                    <th className="p-2">Date</th>
+                    <th className="p-2">Type</th>
+                    <th className="p-2">Method</th>
+                    <th className="p-2">Ref #</th>
+                    <th className="p-2 text-right">Amount</th>
+                    <th className="p-2 text-right">Balance</th>
+                    <th className="p-2 text-center">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {payments.map((p) => (
+                    <tr key={p.id} className="border-b border-slate-100 hover:bg-slate-50/50">
+                      <td className="p-2 font-mono font-bold text-slate-900">{p.receiptNumber}</td>
+                      <td className="p-2 text-slate-600">{p.date}</td>
+                      <td className="p-2 capitalize text-slate-700">
+                        {p.paymentType.toLowerCase().replace('_', ' ')}
+                      </td>
+                      <td className="p-2 font-semibold text-slate-800">{p.paymentMethod}</td>
+                      <td className="p-2 font-mono text-slate-500">{p.referenceNumber || '-'}</td>
+                      <td className="p-2 text-right font-bold text-emerald-700">
+                        {formatRs(p.amountRs)}
+                      </td>
+                      <td className="p-2 text-right text-slate-700">{formatRs(p.balanceAfterRs)}</td>
+                      <td className="p-2 text-center">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setActiveThermalPayment(p)}
+                          className="h-6 px-1.5 text-[10px] font-semibold text-slate-700 border-slate-300 hover:bg-slate-100 gap-1"
+                          title="Print 80mm Receipt"
+                          data-testid={`print-voucher-${p.id}`}
+                        >
+                          <Printer className="w-2.5 h-2.5" />
+                          <span>80mm</span>
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         )}
@@ -1387,6 +1652,61 @@ export function RepairSheetPage() {
           </div>
         </div>
       </Dialog>
+
+      {/* Payment Collection Modal */}
+      {isPaymentModalOpen && (
+        <PaymentCollectionModal
+          isOpen={isPaymentModalOpen}
+          onClose={() => setIsPaymentModalOpen(false)}
+          job={activeJobSheet}
+          onPaymentSuccess={handlePaymentSuccess}
+        />
+      )}
+
+      {/* 80mm Thermal Receipt Voucher Dialog */}
+      {activeThermalPayment && (
+        <Dialog
+          open={Boolean(activeThermalPayment)}
+          onOpenChange={(open) => !open && setActiveThermalPayment(null)}
+        >
+          <div className="bg-white rounded-xl p-4 max-w-sm mx-auto shadow-2xl border border-slate-200 print:border-none print:p-0 print:shadow-none">
+            <div className="flex justify-between items-center mb-3 no-print">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                80mm Payment Receipt Voucher
+              </h3>
+              <DialogClose onClick={() => setActiveThermalPayment(null)} />
+            </div>
+
+            <div className="border border-slate-300 rounded p-2 bg-slate-50 flex justify-center max-h-96 overflow-y-auto mb-3 print:border-none print:p-0 print:bg-transparent print:max-h-none print:overflow-visible print:m-0">
+              <WorkshopPaymentThermalReceipt
+                jobSheet={activeJobSheet}
+                payment={activeThermalPayment}
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 no-print">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setActiveThermalPayment(null)}
+                className="text-xs h-8"
+              >
+                Close
+              </Button>
+              <Button
+                variant="default"
+                size="sm"
+                onClick={() => window.print()}
+                className="text-xs h-8 bg-slate-900 text-white gap-1.5"
+                data-testid="print-thermal-receipt-modal-btn"
+              >
+                <Printer className="w-3.5 h-3.5" />
+                <span>Print Receipt</span>
+              </Button>
+            </div>
+          </div>
+        </Dialog>
+      )}
     </div>
   );
 }

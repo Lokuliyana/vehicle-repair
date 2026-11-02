@@ -95,6 +95,60 @@ export function calculateWorkshopFinancials(
   };
 }
 
+export function determineWorkshopPaymentStatus(params: {
+  grandTotalSalesRs: number;
+  insuranceApprovedRs?: number;
+  advancePaidRs?: number;
+  balanceDueRs: number;
+  payments?: { amountRs: number; paymentType: string }[];
+  isVoid?: boolean;
+}): 'UNPAID' | 'PARTIALLY_PAID' | 'PAID' | 'REFUNDED_VOID' {
+  if (params.isVoid) {
+    return 'REFUNDED_VOID';
+  }
+
+  const grandTotal = Number(params.grandTotalSalesRs) || 0;
+  const insuranceApproved = Math.max(0, Number(params.insuranceApprovedRs) || 0);
+  const advancePaid = Math.max(0, Number(params.advancePaidRs) || 0);
+  const balanceDue = Math.max(0, Number(params.balanceDueRs) || 0);
+  const payments = params.payments || [];
+
+  const totalRecordedPayments = payments.reduce(
+    (sum, p) => sum + (Number(p.amountRs) || 0),
+    0
+  );
+  const totalPaid = Math.max(advancePaid, totalRecordedPayments);
+
+  if (insuranceApproved > 0) {
+    const insuranceSettledAmount = payments
+      .filter((p) => p.paymentType === 'INSURANCE_SETTLEMENT')
+      .reduce((sum, p) => sum + (Number(p.amountRs) || 0), 0);
+
+    const isInsuranceSettled = insuranceSettledAmount >= insuranceApproved;
+
+    if (balanceDue <= 0 && isInsuranceSettled) {
+      return 'PAID';
+    }
+
+    if (totalPaid > 0 || insuranceSettledAmount > 0) {
+      return 'PARTIALLY_PAID';
+    }
+
+    return 'UNPAID';
+  }
+
+  // Without insurance claim (direct customer):
+  if (balanceDue <= 0 && (grandTotal === 0 || totalPaid > 0)) {
+    return 'PAID';
+  }
+
+  if (totalPaid > 0) {
+    return 'PARTIALLY_PAID';
+  }
+
+  return 'UNPAID';
+}
+
 export function calculatePosTotals(
   items: { lineTotalSalesRs: number; lineTotalCostRs: number }[],
   discountRs: number = 0,
