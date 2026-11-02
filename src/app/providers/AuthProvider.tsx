@@ -7,6 +7,8 @@ import {
   ROLE_PERMISSIONS,
   MOCK_USERS_BY_ROLE,
 } from '@/types';
+import { posShiftRepository } from '@/features/pos/repository/pos-shift.repository.mock';
+
 
 interface AuthContextType {
   user: UserProfile;
@@ -123,31 +125,44 @@ export function AuthProvider({
     }
   }, [permissions, role]);
 
-  // POS Shift State
-  const [activeShift, setActiveShift] = useState<PosShift | null>({
-    id: 'SHIFT-2026-001',
-    cashierId: 'user-cashier',
-    cashierName: 'Kamal Fonseka',
-    openedAt: '2026-11-02 08:00 AM',
-    startingCashRs: 15000,
-    status: 'OPEN',
+  // POS Shift State synchronized with posShiftRepository
+  const [activeShift, setActiveShift] = useState<PosShift | null>(() => {
+    return posShiftRepository.getActiveShiftSync();
   });
 
-  const openShift = useCallback((startingCashRs: number = 15000) => {
-    const user = MOCK_USERS_BY_ROLE[role];
-    setActiveShift({
-      id: `SHIFT-${Date.now().toString().slice(-4)}`,
-      cashierId: user.id,
-      cashierName: user.name,
-      openedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      startingCashRs,
-      status: 'OPEN',
+  useEffect(() => {
+    const unsubscribe = posShiftRepository.subscribe((shift) => {
+      setActiveShift(shift);
     });
-  }, [role]);
-
-  const closeShift = useCallback(() => {
-    setActiveShift((prev) => (prev ? { ...prev, status: 'CLOSED', closedAt: new Date().toISOString() } : null));
+    return unsubscribe;
   }, []);
+
+  const openShift = useCallback(
+    (startingCashRs: number = 15000, cashierId?: string, cashierName?: string) => {
+      const activeUser = MOCK_USERS_BY_ROLE[role];
+      const targetCashierId = cashierId || activeUser.id;
+      const targetCashierName = cashierName || activeUser.name;
+      const opened = posShiftRepository.openShiftSync(
+        targetCashierId,
+        targetCashierName,
+        startingCashRs
+      );
+      setActiveShift(opened);
+    },
+    [role]
+  );
+
+  const closeShift = useCallback(
+    (actualDrawerCashRs?: number) => {
+      const current = activeShift || posShiftRepository.getActiveShiftSync();
+      if (!current) return;
+      const counted =
+        actualDrawerCashRs !== undefined ? actualDrawerCashRs : current.expectedDrawerCashRs;
+      const closed = posShiftRepository.closeShiftSync(current.id, counted);
+      setActiveShift(closed);
+    },
+    [activeShift]
+  );
 
   const hasPermission = useCallback((permission: keyof RolePermissions) => {
     return !!permissions[permission];

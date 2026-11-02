@@ -4,7 +4,7 @@ import { formatRs } from '@/utils/currency';
 import { cn } from '@/utils/cn';
 
 export interface ThermalReceiptPrintProps {
-  receipt: PosSaleReceipt;
+  receipt: PosSaleReceipt | import('@/features/pos/types').PosSaleTransaction;
   shopName?: string;
   shopAddress?: string;
   shopPhone?: string;
@@ -22,6 +22,11 @@ export const ThermalReceiptPrint = React.forwardRef<HTMLDivElement, ThermalRecei
     },
     ref
   ) => {
+    const subtotal = receipt.subtotalRs ?? (receipt as any).subtotalSalesRs ?? 0;
+    const discount = receipt.discountRs ?? (receipt as any).overallDiscountRs ?? 0;
+    const netTotal = receipt.netTotalSalesRs ?? (receipt as any).netSalesRs ?? 0;
+    const split = receipt.splitDetails;
+
     return (
       <div
         ref={ref}
@@ -55,9 +60,9 @@ export const ThermalReceiptPrint = React.forwardRef<HTMLDivElement, ThermalRecei
             </div>
           )}
           {receipt.customerNote && (
-            <div className="flex justify-between font-semibold">
-              <span>Note / Vehicle:</span>
-              <span>{receipt.customerNote}</span>
+            <div className="flex justify-between font-semibold gap-2">
+              <span className="shrink-0">Note / Vehicle:</span>
+              <span className="text-right break-words">{receipt.customerNote}</span>
             </div>
           )}
         </div>
@@ -91,22 +96,46 @@ export const ThermalReceiptPrint = React.forwardRef<HTMLDivElement, ThermalRecei
         <div className="border-t border-black pt-1 my-1 text-[8.5pt] space-y-0.5">
           <div className="flex justify-between">
             <span>Subtotal:</span>
-            <span>{formatRs(receipt.subtotalRs)}</span>
+            <span>{formatRs(subtotal)}</span>
           </div>
-          {receipt.discountRs > 0 && (
+          {discount > 0 && (
             <div className="flex justify-between">
               <span>Discount:</span>
-              <span>- {formatRs(receipt.discountRs)}</span>
+              <span>- {formatRs(discount)}</span>
             </div>
           )}
           <div className="flex justify-between font-extrabold text-[10pt] border-t border-dashed border-black pt-1">
             <span>NET TOTAL:</span>
-            <span>{formatRs(receipt.netTotalSalesRs)}</span>
+            <span>{formatRs(netTotal)}</span>
           </div>
           <div className="flex justify-between pt-1 text-[8pt]">
             <span>Payment Method:</span>
             <span className="font-bold">{receipt.paymentMethod}</span>
           </div>
+
+          {receipt.paymentMethod === 'SPLIT' && split && (
+            <div className="text-[7.5pt] text-gray-700 pl-2 space-y-0.5 py-0.5 border-l-2 border-slate-300">
+              {split.cashAmountRs > 0 && (
+                <div className="flex justify-between">
+                  <span>Cash Portion:</span>
+                  <span>{formatRs(split.cashAmountRs)}</span>
+                </div>
+              )}
+              {split.cardAmountRs > 0 && (
+                <div className="flex justify-between">
+                  <span>Card Portion:</span>
+                  <span>{formatRs(split.cardAmountRs)}</span>
+                </div>
+              )}
+              {split.bankTransferAmountRs > 0 && (
+                <div className="flex justify-between">
+                  <span>Bank Transfer:</span>
+                  <span>{formatRs(split.bankTransferAmountRs)}</span>
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="flex justify-between text-[8pt]">
             <span>Amount Tendered:</span>
             <span>{formatRs(receipt.amountTenderedRs)}</span>

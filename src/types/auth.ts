@@ -26,8 +26,18 @@ export interface PosShift {
   openedAt: string;
   closedAt?: string;
   startingCashRs: number;
+  openingFloatRs: number;
+  totalCashSalesRs: number;
+  totalCardSalesRs: number;
+  totalBankTransferSalesRs: number;
+  cashInRs: number;
+  cashOutRs: number;
+  expectedDrawerCashRs: number;
+  actualDrawerCashRs?: number;
+  varianceRs?: number;
   status: 'OPEN' | 'CLOSED';
 }
+
 
 export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
   OWNER: {

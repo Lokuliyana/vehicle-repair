@@ -8,9 +8,22 @@ export type UserRole =
 export * from './auth';
 export * from '@/features/catalog/types';
 export * from '@/features/workshop/types';
+export type {
+  PaymentMethod,
+  PosCartLine,
+  SplitPaymentDetails,
+  PosSaleTransaction,
+  PosShiftDrawerEntry,
+  CreatePosSaleDto,
+  PosSaleFilter,
+} from '@/features/pos/types';
+
 
 export interface PosReceiptLine {
   id: string;
+  catalogItemId?: string;
+  barcode?: string;
+  sku?: string;
   description: string;
   qty: number;
   unitSellingPriceRs: number;
@@ -28,12 +41,19 @@ export interface PosSaleReceipt {
   customerNote: string;
   items: PosReceiptLine[];
   subtotalRs: number;
+  subtotalSalesRs?: number;
   discountRs: number;
+  overallDiscountRs?: number;
   netTotalSalesRs: number;
+  netSalesRs?: number;
   totalCostRs: number;
+  totalBuyingCostRs?: number;
   grossProfitRs: number;
+  grossMarginPct?: number;
   paymentMethod: 'CASH' | 'CARD' | 'BANK_TRANSFER' | 'SPLIT';
   amountTenderedRs: number;
   changeGivenRs: number;
   cashierName?: string;
+  splitDetails?: import('@/features/pos/types').SplitPaymentDetails;
 }
+

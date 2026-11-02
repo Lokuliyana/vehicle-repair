@@ -6,9 +6,10 @@ export interface DialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   children: React.ReactNode;
+  className?: string;
 }
 
-export function Dialog({ open, onOpenChange, children }: DialogProps) {
+export function Dialog({ open, onOpenChange, children, className }: DialogProps) {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && open) {
@@ -30,7 +31,12 @@ export function Dialog({ open, onOpenChange, children }: DialogProps) {
         aria-hidden="true"
       />
       {/* Container */}
-      <div className="relative z-50 w-full max-w-lg rounded-lg border border-slate-200 bg-white p-6 shadow-xl animate-in fade-in-0 zoom-in-95 print:border-none print:shadow-none print:p-0 print:m-0 print:max-w-none print:static">
+      <div
+        className={cn(
+          'relative z-50 w-full max-w-lg rounded-lg border border-slate-200 bg-white p-6 shadow-xl animate-in fade-in-0 zoom-in-95 print:border-none print:shadow-none print:p-0 print:m-0 print:max-w-none print:static',
+          className
+        )}
+      >
         {children}
       </div>
     </div>
