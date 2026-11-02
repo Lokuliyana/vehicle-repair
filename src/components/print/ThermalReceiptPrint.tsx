@@ -73,7 +73,7 @@ export const ThermalReceiptPrint = React.forwardRef<HTMLDivElement, ThermalRecei
           <div className="space-y-1">
             {receipt.items.map((item) => (
               <div key={item.id} className="text-[8.5pt]">
-                <div className="font-medium truncate">{item.description}</div>
+                <div className="font-medium break-words">{item.description}</div>
                 <div className="flex justify-between text-[8pt] text-gray-700 pl-2">
                   <span>
                     {item.qty} x {formatRs(item.unitSellingPriceRs)}

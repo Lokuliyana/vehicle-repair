@@ -29,7 +29,12 @@ export function WorkshopTable({
 }: WorkshopTableProps) {
   const sectionItems = items.filter((item) => item.category === category);
   const pendingFocusRowIdRef = useRef<string | null>(null);
+
+  // Field refs for rapid keyboard navigation
   const descInputRefs = useRef<Map<string, HTMLInputElement>>(new Map());
+  const amountInputRefs = useRef<Map<string, HTMLInputElement>>(new Map());
+  const costInputRefs = useRef<Map<string, HTMLInputElement>>(new Map());
+  const techInputRefs = useRef<Map<string, HTMLInputElement>>(new Map());
 
   useEffect(() => {
     if (pendingFocusRowIdRef.current) {
@@ -51,7 +56,11 @@ export function WorkshopTable({
       if (item.id !== id) return item;
 
       if (field === 'sellingPriceRs' || field === 'buyingCostRs') {
-        const num = Number(value);
+        const valStr = String(value);
+        if (valStr === '') {
+          return { ...item, [field]: 0 };
+        }
+        const num = parseFloat(valStr);
         return { ...item, [field]: isNaN(num) ? 0 : num };
       }
       return { ...item, [field]: value };
@@ -74,12 +83,45 @@ export function WorkshopTable({
     };
 
     pendingFocusRowIdRef.current = newId;
-    onItemsChange([...items, newItem]);
+
+    // Grouping invariant: insert the new item directly after the last item of this category
+    const lastCategoryIdx = items.map((it) => it.category).lastIndexOf(category);
+    let updatedItems: WorkshopLineItem[];
+    if (lastCategoryIdx >= 0) {
+      updatedItems = [
+        ...items.slice(0, lastCategoryIdx + 1),
+        newItem,
+        ...items.slice(lastCategoryIdx + 1),
+      ];
+    } else {
+      const categoryOrder: Record<RepairLineCategory, number> = {
+        LABOR_REMOVE_REASSEMBLE: 1,
+        LABOR_REPAIR: 2,
+        REPLACEMENT: 3,
+      };
+      const targetOrder = categoryOrder[category];
+      const insertIdx = items.findIndex((it) => categoryOrder[it.category] > targetOrder);
+      if (insertIdx >= 0) {
+        updatedItems = [...items.slice(0, insertIdx), newItem, ...items.slice(insertIdx)];
+      } else {
+        updatedItems = [...items, newItem];
+      }
+    }
+
+    // Maintain sequential rowNo for this category
+    let count = 1;
+    const finalItems = updatedItems.map((item) => {
+      if (item.category === category) {
+        return { ...item, rowNo: count++ };
+      }
+      return item;
+    });
+
+    onItemsChange(finalItems);
   };
 
   const handleDeleteRow = (id: string) => {
     const remaining = items.filter((item) => item.id !== id);
-    // Recalculate row numbers for this category
     let count = 1;
     const renumbered = remaining.map((item) => {
       if (item.category === category) {
@@ -90,14 +132,65 @@ export function WorkshopTable({
     onItemsChange(renumbered);
   };
 
-  const handleKeyDown = (
+  // Keyboard navigation across cells and rows
+  const handleCellKeyDown = (
     e: React.KeyboardEvent<HTMLInputElement>,
-    itemIndex: number,
-    isFinalInputInRow: boolean
+    col: 'desc' | 'amount' | 'cost' | 'tech',
+    idx: number,
+    item: WorkshopLineItem
   ) => {
+    // Arrow Down navigation to same column next row
+    if (e.key === 'ArrowDown') {
+      if (idx < sectionItems.length - 1) {
+        e.preventDefault();
+        const nextId = sectionItems[idx + 1].id;
+        const refMap =
+          col === 'desc'
+            ? descInputRefs
+            : col === 'amount'
+            ? amountInputRefs
+            : col === 'cost'
+            ? costInputRefs
+            : techInputRefs;
+        refMap.current.get(nextId)?.focus();
+      }
+      return;
+    }
+
+    // Arrow Up navigation to same column previous row
+    if (e.key === 'ArrowUp') {
+      if (idx > 0) {
+        e.preventDefault();
+        const prevId = sectionItems[idx - 1].id;
+        const refMap =
+          col === 'desc'
+            ? descInputRefs
+            : col === 'amount'
+            ? amountInputRefs
+            : col === 'cost'
+            ? costInputRefs
+            : techInputRefs;
+        refMap.current.get(prevId)?.focus();
+      }
+      return;
+    }
+
+    // Enter navigation: advance or append
     if (e.key === 'Enter') {
       e.preventDefault();
-      if (isFinalInputInRow || itemIndex === sectionItems.length - 1) {
+      if (col === 'desc') {
+        if (isJobCardMode) {
+          techInputRefs.current.get(item.id)?.focus();
+        } else {
+          amountInputRefs.current.get(item.id)?.focus();
+        }
+      } else if (col === 'amount') {
+        if (isCostProfitVisible) {
+          costInputRefs.current.get(item.id)?.focus();
+        } else {
+          handleAddRow();
+        }
+      } else if (col === 'cost' || col === 'tech') {
         handleAddRow();
       }
     }
@@ -212,6 +305,7 @@ export function WorkshopTable({
                         onChange={(e) =>
                           handleUpdateItem(item.id, 'description', e.target.value)
                         }
+                        onKeyDown={(e) => handleCellKeyDown(e, 'desc', idx, item)}
                         placeholder="Enter repair or replacement item description..."
                         className="h-8 text-xs border-slate-300 focus-visible:ring-1 focus-visible:ring-slate-600"
                         data-testid={`desc-input-${item.id}`}
@@ -223,11 +317,15 @@ export function WorkshopTable({
                         {/* Assigned Technician */}
                         <td className="px-2 py-1 border-r border-slate-200">
                           <Input
+                            ref={(el) => {
+                              if (el) techInputRefs.current.set(item.id, el);
+                              else techInputRefs.current.delete(item.id);
+                            }}
                             value={item.assignedTechnician || ''}
                             onChange={(e) =>
                               handleUpdateItem(item.id, 'assignedTechnician', e.target.value)
                             }
-                            onKeyDown={(e) => handleKeyDown(e, idx, true)}
+                            onKeyDown={(e) => handleCellKeyDown(e, 'tech', idx, item)}
                             placeholder="Assign technician..."
                             className="h-8 text-xs border-slate-300"
                             data-testid={`tech-input-${item.id}`}
@@ -251,6 +349,10 @@ export function WorkshopTable({
                         {/* Selling Price / Customer Amount */}
                         <td className="px-2 py-1 border-r border-slate-200 text-right">
                           <Input
+                            ref={(el) => {
+                              if (el) amountInputRefs.current.set(item.id, el);
+                              else amountInputRefs.current.delete(item.id);
+                            }}
                             type="number"
                             min="0"
                             step="0.01"
@@ -258,9 +360,7 @@ export function WorkshopTable({
                             onChange={(e) =>
                               handleUpdateItem(item.id, 'sellingPriceRs', e.target.value)
                             }
-                            onKeyDown={(e) =>
-                              handleKeyDown(e, idx, !isCostProfitVisible)
-                            }
+                            onKeyDown={(e) => handleCellKeyDown(e, 'amount', idx, item)}
                             placeholder="0.00"
                             className="h-8 text-xs text-right font-medium border-slate-300"
                             data-testid={`amount-input-${item.id}`}
@@ -272,6 +372,10 @@ export function WorkshopTable({
                           <>
                             <td className="px-2 py-1 border-r border-amber-200 bg-amber-50/50 text-right">
                               <Input
+                                ref={(el) => {
+                                  if (el) costInputRefs.current.set(item.id, el);
+                                  else costInputRefs.current.delete(item.id);
+                                }}
                                 type="number"
                                 min="0"
                                 step="0.01"
@@ -279,7 +383,7 @@ export function WorkshopTable({
                                 onChange={(e) =>
                                   handleUpdateItem(item.id, 'buyingCostRs', e.target.value)
                                 }
-                                onKeyDown={(e) => handleKeyDown(e, idx, true)}
+                                onKeyDown={(e) => handleCellKeyDown(e, 'cost', idx, item)}
                                 placeholder="0.00"
                                 className="h-8 text-xs text-right font-medium border-amber-300 bg-white"
                                 data-testid={`cost-input-${item.id}`}

@@ -49,7 +49,7 @@ const MOCK_JOB_SHEET: WorkshopJobSheet = {
       id: 'l3',
       rowNo: 1,
       category: 'REPLACEMENT',
-      description: 'Rear Bumper Bracket LH Genuine',
+      description: 'Rear Bumper Bracket LH Genuine OEM Extra Long Part Description That Must Wrap Cleanly',
       sellingPriceRs: 8500,
       buyingCostRs: 6200, // INTERNAL SENSITIVE COST
       assignedTechnician: 'Store',
@@ -83,7 +83,7 @@ const MOCK_POS_RECEIPT: PosSaleReceipt = {
   items: [
     {
       id: 'p1',
-      description: 'Engine Coolant 1L',
+      description: 'Engine Coolant 1L High-Performance Anti-Freeze / Anti-Boil Coolant Blue',
       qty: 2,
       unitSellingPriceRs: 1800,
       unitBuyingCostRs: 1200, // INTERNAL SENSITIVE COST
@@ -155,17 +155,62 @@ describe('A4 Workshop Print Engine & Privacy Invariant', () => {
     expect(screen.getByText('Sunil Silva - 071 234 5678')).toBeInTheDocument();
   });
 
-  it('renders 3 distinct numbered sections and bottom disclaimers', () => {
+  it('renders 3 distinct numbered sections, bottom disclaimers, and Customer Payable on insurance split', () => {
     render(<A4WorkshopPrint jobSheet={MOCK_JOB_SHEET} />);
 
     expect(screen.getByText('1. Labor - Remove & Reassemble')).toBeInTheDocument();
     expect(screen.getByText('2. Labor - Repair')).toBeInTheDocument();
     expect(screen.getByText('3. Replacement')).toBeInTheDocument();
 
+    expect(screen.getByText('Insurance Approved:')).toBeInTheDocument();
+    expect(screen.getByText('Customer Payable:')).toBeInTheDocument();
+    expect(screen.getByText('Balance Due:')).toBeInTheDocument();
+
     expect(
       screen.getByText(/Computer generated estimate and does not carry a signature/i)
     ).toBeInTheDocument();
     expect(screen.getByText(/T H A N K \s*Y O U/i)).toBeInTheDocument();
+  });
+
+  it('renders Balance Due for direct customer repairs without insurance when advance is paid', () => {
+    const directCustomerSheet: WorkshopJobSheet = {
+      ...MOCK_JOB_SHEET,
+      docStage: 'ESTIMATE',
+      financials: {
+        ...MOCK_JOB_SHEET.financials,
+        insuranceApprovedRs: 0,
+        advancePaidRs: 10000,
+        customerPayableRs: 28000,
+        balanceDueRs: 18000,
+      },
+    };
+
+    render(<A4WorkshopPrint jobSheet={directCustomerSheet} />);
+
+    expect(screen.queryByText('Insurance Approved:')).not.toBeInTheDocument();
+    expect(screen.getByText('Advance Paid:')).toBeInTheDocument();
+    expect(screen.getByText('Balance Due:')).toBeInTheDocument();
+    expect(screen.getByText('Rs. 18,000.00')).toBeInTheDocument();
+  });
+
+  it('renders Balance Due when document stage is INVOICE even with zero advance', () => {
+    const invoiceSheet: WorkshopJobSheet = {
+      ...MOCK_JOB_SHEET,
+      docStage: 'INVOICE',
+      financials: {
+        ...MOCK_JOB_SHEET.financials,
+        insuranceApprovedRs: 0,
+        advancePaidRs: 0,
+        customerPayableRs: 28000,
+        balanceDueRs: 28000,
+      },
+    };
+
+    render(<A4WorkshopPrint jobSheet={invoiceSheet} />);
+
+    expect(screen.getByText('VEHICLE REPAIR INVOICE')).toBeInTheDocument();
+    expect(screen.getByText('Balance Due:')).toBeInTheDocument();
+    expect(screen.getAllByText('Rs. 28,000.00').length).toBeGreaterThanOrEqual(1);
   });
 
   it('ENFORCES PRIVACY INVARIANT: Internal Buying Costs and Gross Profits are NEVER in the A4 Print DOM', () => {
@@ -206,11 +251,15 @@ describe('A4 Workshop Print Engine & Privacy Invariant', () => {
 });
 
 describe('80mm POS Thermal Receipt Print & Privacy', () => {
-  it('renders thermal receipt header, itemized quantities, and totals', () => {
+  it('renders thermal receipt header, itemized quantities, and totals with text wrapping', () => {
     render(<ThermalReceiptPrint receipt={MOCK_POS_RECEIPT} />);
 
     expect(screen.getByText('POS-2026-5555')).toBeInTheDocument();
-    expect(screen.getByText('Engine Coolant 1L')).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Engine Coolant 1L High-Performance Anti-Freeze / Anti-Boil Coolant Blue'
+      )
+    ).toBeInTheDocument();
     expect(screen.getAllByText('Rs. 3,600.00').length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('Rs. 1,400.00')).toBeInTheDocument(); // Change
     expect(screen.getByText('THANK YOU FOR YOUR BUSINESS!')).toBeInTheDocument();

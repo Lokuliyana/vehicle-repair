@@ -73,11 +73,11 @@ export const A4WorkshopPrint = React.forwardRef<HTMLDivElement, A4WorkshopPrintP
           {/* Row 1 */}
           <div className="grid grid-cols-2 border-b border-black divide-x divide-black">
             <div className="p-1.5 flex">
-              <span className="font-bold w-32 shrink-0">Date:</span>
+              <span className="font-bold w-36 shrink-0">Date:</span>
               <span className="font-semibold text-black">{header.date || '-'}</span>
             </div>
             <div className="p-1.5 flex">
-              <span className="font-bold w-32 shrink-0">Job Number:</span>
+              <span className="font-bold w-36 shrink-0">Job Number:</span>
               <span className="font-bold text-black">{header.jobNumber || '-'}</span>
             </div>
           </div>
@@ -85,11 +85,11 @@ export const A4WorkshopPrint = React.forwardRef<HTMLDivElement, A4WorkshopPrintP
           {/* Row 2 */}
           <div className="grid grid-cols-2 border-b border-black divide-x divide-black">
             <div className="p-1.5 flex">
-              <span className="font-bold w-32 shrink-0">Vehicle Number:</span>
+              <span className="font-bold w-36 shrink-0">Vehicle Number:</span>
               <span className="font-bold text-black uppercase">{header.vehicleNumber || '-'}</span>
             </div>
             <div className="p-1.5 flex">
-              <span className="font-bold w-32 shrink-0">Nature of Repair:</span>
+              <span className="font-bold w-36 shrink-0">Nature of Repair:</span>
               <span className="text-black">{header.natureOfRepair || '-'}</span>
             </div>
           </div>
@@ -97,11 +97,11 @@ export const A4WorkshopPrint = React.forwardRef<HTMLDivElement, A4WorkshopPrintP
           {/* Row 3 */}
           <div className="grid grid-cols-2 border-b border-black divide-x divide-black">
             <div className="p-1.5 flex">
-              <span className="font-bold w-32 shrink-0">Vehicle Make:</span>
+              <span className="font-bold w-36 shrink-0">Vehicle Make:</span>
               <span className="text-black">{header.vehicleMake || '-'}</span>
             </div>
             <div className="p-1.5 flex">
-              <span className="font-bold w-32 shrink-0">Chassis Number:</span>
+              <span className="font-bold w-36 shrink-0">Chassis Number:</span>
               <span className="font-mono text-black">{header.chassisNumber || '-'}</span>
             </div>
           </div>
@@ -109,11 +109,11 @@ export const A4WorkshopPrint = React.forwardRef<HTMLDivElement, A4WorkshopPrintP
           {/* Row 4 */}
           <div className="grid grid-cols-2 border-b border-black divide-x divide-black">
             <div className="p-1.5 flex">
-              <span className="font-bold w-32 shrink-0">Vehicle Model:</span>
+              <span className="font-bold w-36 shrink-0">Vehicle Model:</span>
               <span className="text-black">{header.vehicleModel || '-'}</span>
             </div>
             <div className="p-1.5 flex">
-              <span className="font-bold w-32 shrink-0">No of Days Completion:</span>
+              <span className="font-bold w-36 shrink-0">No of Days Completion:</span>
               <span className="text-black">{header.daysForCompletion || '-'}</span>
             </div>
           </div>
@@ -121,24 +121,24 @@ export const A4WorkshopPrint = React.forwardRef<HTMLDivElement, A4WorkshopPrintP
           {/* Row 5 */}
           <div className="grid grid-cols-2 border-b border-black divide-x divide-black">
             <div className="p-1.5 flex">
-              <span className="font-bold w-32 shrink-0">Year of Make:</span>
+              <span className="font-bold w-36 shrink-0">Year of Make:</span>
               <span className="text-black">{header.yearOfMake || '-'}</span>
             </div>
             <div className="p-1.5 flex">
-              <span className="font-bold w-32 shrink-0">Vehicle Color:</span>
+              <span className="font-bold w-36 shrink-0">Vehicle Color:</span>
               <span className="text-black">{header.vehicleColor || '-'}</span>
             </div>
           </div>
 
           {/* Row 6: Insurance (Full-width) */}
           <div className="p-1.5 border-b border-black flex">
-            <span className="font-bold w-32 shrink-0">Name of Insurance:</span>
+            <span className="font-bold w-36 shrink-0">Name of Insurance:</span>
             <span className="text-black font-semibold">{header.insuranceName || 'None / Direct Customer'}</span>
           </div>
 
           {/* Row 7: Customer Info (Full-width) */}
           <div className="p-1.5 flex">
-            <span className="font-bold w-32 shrink-0">Customer Information:</span>
+            <span className="font-bold w-36 shrink-0">Customer Information:</span>
             <span className="text-black">{header.customerInfo || '-'}</span>
           </div>
         </div>
@@ -178,7 +178,7 @@ export const A4WorkshopPrint = React.forwardRef<HTMLDivElement, A4WorkshopPrintP
                 removeReassembleLines.map((line, idx) => (
                   <tr key={line.id} className="border-b border-black">
                     <td className="border-r border-black p-1 text-center">{idx + 1}</td>
-                    <td className="border-r border-black p-1">{line.description}</td>
+                    <td className="border-r border-black p-1 break-words">{line.description}</td>
                     {isJobCard ? (
                       <>
                         <td className="border-r border-black p-1">{line.assignedTechnician || '-'}</td>
@@ -243,7 +243,7 @@ export const A4WorkshopPrint = React.forwardRef<HTMLDivElement, A4WorkshopPrintP
                 repairLines.map((line, idx) => (
                   <tr key={line.id} className="border-b border-black">
                     <td className="border-r border-black p-1 text-center">{idx + 1}</td>
-                    <td className="border-r border-black p-1">{line.description}</td>
+                    <td className="border-r border-black p-1 break-words">{line.description}</td>
                     {isJobCard ? (
                       <>
                         <td className="border-r border-black p-1">{line.assignedTechnician || '-'}</td>
@@ -308,7 +308,7 @@ export const A4WorkshopPrint = React.forwardRef<HTMLDivElement, A4WorkshopPrintP
                 replacementLines.map((line, idx) => (
                   <tr key={line.id} className="border-b border-black">
                     <td className="border-r border-black p-1 text-center">{idx + 1}</td>
-                    <td className="border-r border-black p-1">{line.description}</td>
+                    <td className="border-r border-black p-1 break-words">{line.description}</td>
                     {isJobCard ? (
                       <>
                         <td className="border-r border-black p-1">{line.assignedTechnician || '-'}</td>
@@ -371,12 +371,18 @@ export const A4WorkshopPrint = React.forwardRef<HTMLDivElement, A4WorkshopPrintP
                 <span>{formatRs(financials.grandTotalSalesRs)}</span>
               </div>
 
-              {/* Split billing if Invoice or recorded */}
+              {/* Split billing if Insurance Claim */}
               {financials.insuranceApprovedRs > 0 && (
-                <div className="flex justify-between p-1.5 border-b border-black text-blue-900">
-                  <span className="font-semibold">Insurance Approved:</span>
-                  <span>{formatRs(financials.insuranceApprovedRs)}</span>
-                </div>
+                <>
+                  <div className="flex justify-between p-1.5 border-b border-black text-blue-900">
+                    <span className="font-semibold">Insurance Approved:</span>
+                    <span>{formatRs(financials.insuranceApprovedRs)}</span>
+                  </div>
+                  <div className="flex justify-between p-1.5 border-b border-black font-semibold">
+                    <span>Customer Payable:</span>
+                    <span>{formatRs(financials.customerPayableRs)}</span>
+                  </div>
+                </>
               )}
               {financials.advancePaidRs > 0 && (
                 <div className="flex justify-between p-1.5 border-b border-black text-emerald-800">
@@ -384,12 +390,15 @@ export const A4WorkshopPrint = React.forwardRef<HTMLDivElement, A4WorkshopPrintP
                   <span>{formatRs(financials.advancePaidRs)}</span>
                 </div>
               )}
-              {financials.balanceDueRs !== undefined && financials.insuranceApprovedRs > 0 && (
-                <div className="flex justify-between p-1.5 font-bold bg-amber-50 text-amber-950">
-                  <span>Balance Due:</span>
-                  <span>{formatRs(financials.balanceDueRs)}</span>
-                </div>
-              )}
+              {financials.balanceDueRs !== undefined &&
+                (financials.insuranceApprovedRs > 0 ||
+                  financials.advancePaidRs > 0 ||
+                  docStage === 'INVOICE') && (
+                  <div className="flex justify-between p-1.5 font-bold bg-amber-50 text-amber-950">
+                    <span>Balance Due:</span>
+                    <span>{formatRs(financials.balanceDueRs)}</span>
+                  </div>
+                )}
             </div>
           </div>
         )}

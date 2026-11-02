@@ -224,6 +224,24 @@ export default function App() {
     });
   };
 
+  const handleFinancialFieldChange = (
+    field: 'discountRs' | 'taxRs' | 'insuranceApprovedRs' | 'advancePaidRs',
+    val: string
+  ) => {
+    const num = Math.max(0, parseFloat(val) || 0);
+    const recalc = calculateWorkshopFinancials(
+      jobSheet.lines,
+      field === 'discountRs' ? num : jobSheet.financials.discountRs,
+      field === 'taxRs' ? num : jobSheet.financials.taxRs,
+      field === 'insuranceApprovedRs' ? num : jobSheet.financials.insuranceApprovedRs,
+      field === 'advancePaidRs' ? num : jobSheet.financials.advancePaidRs
+    );
+    setJobSheet((prev) => ({
+      ...prev,
+      financials: recalc,
+    }));
+  };
+
   const handlePrint = () => {
     window.print();
   };
@@ -444,6 +462,55 @@ export default function App() {
                 <div className="text-[11px] text-blue-700 mt-0.5">
                   Ins. Approved: {formatRs(jobSheet.financials.insuranceApprovedRs)}
                 </div>
+              </div>
+            </div>
+
+            {/* Split Billing & Settlement Controls */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3 mt-3 border-t border-slate-200 text-xs">
+              <div>
+                <label className="font-semibold text-slate-700 block mb-1">
+                  Overall Discount (Rs.)
+                </label>
+                <Input
+                  type="number"
+                  min="0"
+                  step="100"
+                  value={jobSheet.financials.discountRs || ''}
+                  onChange={(e) => handleFinancialFieldChange('discountRs', e.target.value)}
+                  placeholder="0.00"
+                  className="h-8 text-xs text-right"
+                  data-testid="summary-discount-input"
+                />
+              </div>
+              <div>
+                <label className="font-semibold text-blue-900 block mb-1">
+                  Insurance Approved Amount (Rs.)
+                </label>
+                <Input
+                  type="number"
+                  min="0"
+                  step="1000"
+                  value={jobSheet.financials.insuranceApprovedRs || ''}
+                  onChange={(e) => handleFinancialFieldChange('insuranceApprovedRs', e.target.value)}
+                  placeholder="0.00"
+                  className="h-8 text-xs text-right border-blue-300"
+                  data-testid="summary-insurance-input"
+                />
+              </div>
+              <div>
+                <label className="font-semibold text-emerald-900 block mb-1">
+                  Customer Advance Paid (Rs.)
+                </label>
+                <Input
+                  type="number"
+                  min="0"
+                  step="1000"
+                  value={jobSheet.financials.advancePaidRs || ''}
+                  onChange={(e) => handleFinancialFieldChange('advancePaidRs', e.target.value)}
+                  placeholder="0.00"
+                  className="h-8 text-xs text-right border-emerald-300"
+                  data-testid="summary-advance-input"
+                />
               </div>
             </div>
           </div>
