@@ -37,8 +37,14 @@ export class ApiClient {
       });
   }
 
+  private getEndpointUrl(endpoint: string): string {
+    const cleanBase = (this.baseUrl || '').replace(/\/+$/, '');
+    const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+    return `${cleanBase}${cleanEndpoint}`;
+  }
+
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-    const url = `${this.baseUrl}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
+    const url = this.getEndpointUrl(endpoint);
     const token = this.getAuthToken?.();
 
     const headers: Record<string, string> = {

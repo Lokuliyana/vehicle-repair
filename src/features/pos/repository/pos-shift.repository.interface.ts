@@ -8,7 +8,7 @@ export interface IPosShiftRepository {
   getShiftByIdSync?(id: string): PosShift | null;
   openShiftSync?(cashierId: string, cashierName: string, openingFloatRs?: number): PosShift;
   openShift(cashierId: string, cashierName: string, openingFloatRs?: number): Promise<PosShift>;
-  closeShiftSync?(shiftId: string, actualDrawerCashRs: number): PosShift;
+  closeShiftSync?(shiftId: string, actualDrawerCashRs: number, note?: string): PosShift;
   recordCashIn(
     shiftId: string,
     amountRs: number,
@@ -27,7 +27,7 @@ export interface IPosShiftRepository {
     netSalesRs: number,
     splitDetails?: SplitPaymentDetails
   ): Promise<PosShift>;
-  closeShift(shiftId: string, actualDrawerCashRs: number): Promise<PosShift>;
+  closeShift(shiftId: string, actualDrawerCashRs: number, note?: string): Promise<PosShift>;
   getShiftDrawerEntries(shiftId: string): Promise<PosShiftDrawerEntry[]>;
   resetToDefaults(): Promise<void>;
 }

@@ -232,6 +232,21 @@ describe('Comprehensive Cost Privacy Invariant Audit (Master Guide Section 14)',
       expect(html).not.toContain('Buying Cost');
       expect(html).not.toContain('Gross Profit');
     });
+
+    it('guarantees payment settlement history and advance payments are completely redacted if present on a Job Card', () => {
+      const jobCardWithPayments: WorkshopJobSheet = {
+        ...MOCK_AUDIT_JOB_SHEET,
+        docStage: 'JOB_CARD',
+        payments: [MOCK_AUDIT_PAYMENT],
+      };
+
+      const { container } = render(<A4WorkshopPrint jobSheet={jobCardWithPayments} />);
+      const html = container.innerHTML;
+
+      expect(screen.queryByTestId('a4-payment-receipts-table')).not.toBeInTheDocument();
+      expect(html).not.toContain('5,000.00');
+      expect(html).not.toContain('RCP-2026-0099');
+    });
   });
 
   describe('4. A4 Final Invoice Printout Privacy Audit', () => {
@@ -403,6 +418,71 @@ describe('Comprehensive Cost Privacy Invariant Audit (Master Guide Section 14)',
       expect(screen.queryByTestId('cart-internal-cost')).not.toBeInTheDocument();
       expect(screen.queryByTestId('cart-internal-profit')).not.toBeInTheDocument();
       expect(screen.queryByText(/Internal Cost & Margin/i)).not.toBeInTheDocument();
+    });
+  });
+
+  describe('8. Service Advisor Role Screen View Privacy Audit', () => {
+    it('hides Buying Cost and Gross Profit in Catalog for SERVICE_ADVISOR', async () => {
+      render(
+        <MemoryRouter>
+          <AuthProvider initialRole="SERVICE_ADVISOR">
+            <ToastProvider>
+              <CatalogListPage />
+            </ToastProvider>
+          </AuthProvider>
+        </MemoryRouter>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByTestId('catalog-list-page')).toBeInTheDocument();
+      });
+
+      expect(screen.queryByTestId('buying-cost-header')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('profit-header')).not.toBeInTheDocument();
+      expect(screen.queryByText(/Buying Cost/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/Est\. Profit/i)).not.toBeInTheDocument();
+    });
+
+    it('redacts Buying Cost, Gross Profit panel, and profit columns on RepairSheetPage for SERVICE_ADVISOR', async () => {
+      const created = await workshopJobRepository.create({
+        ...MOCK_AUDIT_JOB_SHEET,
+      });
+
+      localStorage.setItem('antigravity_cost_mode_visible', 'true');
+
+      const router = createMemoryRouter(
+        [
+          {
+            path: '/workshop/sheet/:id',
+            element: <RepairSheetPage />,
+          },
+        ],
+        { initialEntries: [`/workshop/sheet/${created.id}`] }
+      );
+
+      render(
+        <ToastProvider>
+          <AuthProvider initialRole="SERVICE_ADVISOR">
+            <RouterProvider router={router} />
+          </AuthProvider>
+        </ToastProvider>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByTestId('repair-sheet-page')).toBeInTheDocument();
+      });
+
+      // Legitimate customer figures ARE visible
+      expect(screen.getByTestId('grand-total-amount')).toBeInTheDocument();
+
+      // Cost & Profit internal metrics MUST NOT be present
+      expect(screen.queryByTestId('cost-profit-panel')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('total-buying-cost-display')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('gross-profit-amount')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('gross-margin-pct')).not.toBeInTheDocument();
+      expect(screen.queryByText('Buying Cost (Rs.)')).not.toBeInTheDocument();
+      expect(screen.queryByText('Line Profit')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('cost-input-l1')).not.toBeInTheDocument();
     });
   });
 });

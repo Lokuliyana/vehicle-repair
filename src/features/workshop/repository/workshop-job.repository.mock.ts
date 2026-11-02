@@ -6,6 +6,8 @@ import {
   RecordPaymentDto,
   WorkshopPaymentRecord,
   AuditLogEntry,
+  DocumentStage,
+  OriginalEstimateSnapshotData,
 } from '../types';
 import { IWorkshopJobRepository } from './workshop-job.repository.interface';
 import {
@@ -722,6 +724,54 @@ export class MockWorkshopJobRepository implements IWorkshopJobRepository {
     this.syncVehicleHistory(updatedJob);
 
     return { ...updatedJob };
+  }
+
+  async convertStage(
+    id: string,
+    targetStage: DocumentStage,
+    reason?: string
+  ): Promise<WorkshopJobSheet> {
+    this.init();
+    const index = this.jobs.findIndex((j) => j.id === id);
+    if (index === -1) {
+      throw new Error(`Job not found with id: ${id}`);
+    }
+
+    const current = this.jobs[index];
+    let snapshot = current.originalEstimateSnapshot;
+
+    if (targetStage === 'JOB_CARD' && !snapshot) {
+      const snapData: OriginalEstimateSnapshotData = {
+        lines: [...current.lines],
+        financials: { ...current.financials },
+        grandTotalSalesRs: current.financials.grandTotalSalesRs,
+        subtotalRemoveReassembleRs: current.financials.subtotalRemoveReassembleRs,
+        subtotalRepairRs: current.financials.subtotalRepairRs,
+        subtotalReplacementRs: current.financials.subtotalReplacementRs,
+        discountRs: current.financials.discountRs,
+        taxRs: current.financials.taxRs,
+        frozenAt: new Date().toISOString(),
+        stage: current.docStage,
+      };
+      snapshot = JSON.stringify(snapData);
+    }
+
+    const auditLogs = [...(current.auditLogs || [])];
+    auditLogs.push({
+      id: `audit-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      timestamp: new Date().toISOString(),
+      actor: 'System / User',
+      action: 'STAGE_CONVERSION',
+      fromState: current.docStage,
+      toState: targetStage,
+      comment: reason || `Document stage converted from ${current.docStage} to ${targetStage}.`,
+    });
+
+    return this.update(id, {
+      docStage: targetStage,
+      originalEstimateSnapshot: snapshot,
+      auditLogs,
+    });
   }
 
   async recordPayment(id: string, paymentDto: RecordPaymentDto): Promise<WorkshopJobSheet> {

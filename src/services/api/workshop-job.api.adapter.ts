@@ -5,6 +5,7 @@ import {
   UpdateWorkshopJobSheetDto,
   WorkshopJobFilter,
   RecordPaymentDto,
+  DocumentStage,
 } from '@/features/workshop/types';
 import { ApiClient, apiClient } from './api-client';
 
@@ -48,6 +49,17 @@ export class WorkshopJobApiAdapter implements IWorkshopJobRepository {
     return this.client.put<WorkshopJobSheet>(`/workshop/jobs/${id}`, updates);
   }
 
+  async convertStage(
+    id: string,
+    targetStage: DocumentStage,
+    reason?: string
+  ): Promise<WorkshopJobSheet> {
+    return this.client.post<WorkshopJobSheet>(`/workshop/jobs/${id}/convert-stage`, {
+      targetStage,
+      reason,
+    });
+  }
+
   async recordPayment(id: string, paymentDto: RecordPaymentDto): Promise<WorkshopJobSheet> {
     return this.client.post<WorkshopJobSheet>(`/workshop/jobs/${id}/payments`, paymentDto);
   }
@@ -62,8 +74,8 @@ export class WorkshopJobApiAdapter implements IWorkshopJobRepository {
       '/workshop/jobs',
       {
         search: filter.search,
-        stage: filter.stage,
-        status: filter.status,
+        stage: filter.stage !== 'ALL' ? filter.stage : undefined,
+        floorStatus: filter.status !== 'ALL' ? filter.status : undefined,
         vehicleNumber: filter.vehicleNumber,
       }
     );

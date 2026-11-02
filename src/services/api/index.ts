@@ -6,6 +6,7 @@
 export * from './api-client';
 export * from './catalog.api.adapter';
 export * from './workshop-job.api.adapter';
+export * from './vehicle-history.api.adapter';
 export * from './pos-sale.api.adapter';
 export * from './pos-shift.api.adapter';
 export * from './finance.api.adapter';
@@ -13,6 +14,7 @@ export * from './analytics.api.adapter';
 
 import { catalogApiAdapter } from './catalog.api.adapter';
 import { workshopJobApiAdapter } from './workshop-job.api.adapter';
+import { vehicleHistoryApiAdapter } from './vehicle-history.api.adapter';
 import { posSaleApiAdapter } from './pos-sale.api.adapter';
 import { posShiftApiAdapter } from './pos-shift.api.adapter';
 import { financeApiAdapter } from './finance.api.adapter';
@@ -20,6 +22,7 @@ import { analyticsApiAdapter } from './analytics.api.adapter';
 
 import { catalogRepository } from '@/features/catalog/repository/catalog.repository.mock';
 import { workshopJobRepository } from '@/features/workshop/repository/workshop-job.repository.mock';
+import { vehicleHistoryRepository } from '@/features/workshop/repository/vehicle-history.repository.mock';
 import { posSaleRepository } from '@/features/pos/repository/pos-sale.repository.mock';
 import { posShiftRepository } from '@/features/pos/repository/pos-shift.repository.mock';
 import { financeRepository } from '@/features/finance-reports/repository/finance.repository.mock';
@@ -40,6 +43,7 @@ export const getRepositories = () => {
   return {
     catalogRepository: useApi ? catalogApiAdapter : catalogRepository,
     workshopJobRepository: useApi ? workshopJobApiAdapter : workshopJobRepository,
+    vehicleHistoryRepository: useApi ? vehicleHistoryApiAdapter : vehicleHistoryRepository,
     posSaleRepository: useApi ? posSaleApiAdapter : posSaleRepository,
     posShiftRepository: useApi ? posShiftApiAdapter : posShiftRepository,
     financeRepository: useApi ? financeApiAdapter : financeRepository,

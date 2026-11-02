@@ -79,6 +79,7 @@ export interface PosShift {
   actualDrawerCashRs?: number;
   varianceRs?: number;
   status: 'OPEN' | 'CLOSED';
+  note?: string;
 }
 
 export interface CreatePosSaleDto {

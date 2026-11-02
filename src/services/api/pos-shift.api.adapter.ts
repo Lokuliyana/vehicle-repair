@@ -47,9 +47,14 @@ export class PosShiftApiAdapter implements IPosShiftRepository {
     });
   }
 
-  async closeShift(shiftId: string, actualDrawerCashRs: number): Promise<PosShift> {
+  async closeShift(
+    shiftId: string,
+    actualDrawerCashRs: number,
+    note?: string
+  ): Promise<PosShift> {
     return this.client.post<PosShift>(`/pos/shifts/${shiftId}/close`, {
       actualDrawerCashRs,
+      note,
     });
   }
 

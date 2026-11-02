@@ -273,7 +273,7 @@ export class MockPosShiftRepository implements IPosShiftRepository {
     return shift;
   }
 
-  closeShiftSync(shiftId: string, actualDrawerCashRs: number): PosShift {
+  closeShiftSync(shiftId: string, actualDrawerCashRs: number, note?: string): PosShift {
     const shifts = this.loadShifts();
     const shift = shifts.find((s) => s.id === shiftId);
     if (!shift) {
@@ -284,13 +284,16 @@ export class MockPosShiftRepository implements IPosShiftRepository {
     shift.varianceRs = actualDrawerCashRs - shift.expectedDrawerCashRs;
     shift.closedAt = new Date().toISOString();
     shift.status = 'CLOSED';
+    if (note !== undefined) {
+      shift.note = note;
+    }
 
     this.saveShifts(shifts);
     return shift;
   }
 
-  async closeShift(shiftId: string, actualDrawerCashRs: number): Promise<PosShift> {
-    return this.closeShiftSync(shiftId, actualDrawerCashRs);
+  async closeShift(shiftId: string, actualDrawerCashRs: number, note?: string): Promise<PosShift> {
+    return this.closeShiftSync(shiftId, actualDrawerCashRs, note);
   }
 
   async getShiftDrawerEntries(shiftId: string): Promise<PosShiftDrawerEntry[]> {

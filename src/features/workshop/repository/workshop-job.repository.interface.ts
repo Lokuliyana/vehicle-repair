@@ -4,6 +4,7 @@ import {
   UpdateWorkshopJobSheetDto,
   WorkshopJobFilter,
   RecordPaymentDto,
+  DocumentStage,
 } from '../types';
 
 export interface IWorkshopJobRepository {
@@ -13,6 +14,7 @@ export interface IWorkshopJobRepository {
   getByJobNumber(jobNumber: string): Promise<WorkshopJobSheet | null>;
   create(dto: CreateWorkshopJobSheetDto): Promise<WorkshopJobSheet>;
   update(id: string, updates: UpdateWorkshopJobSheetDto): Promise<WorkshopJobSheet>;
+  convertStage(id: string, targetStage: DocumentStage, reason?: string): Promise<WorkshopJobSheet>;
   recordPayment(id: string, paymentDto: RecordPaymentDto): Promise<WorkshopJobSheet>;
   delete(id: string): Promise<boolean>;
   filter(filter: WorkshopJobFilter): Promise<WorkshopJobSheet[]>;

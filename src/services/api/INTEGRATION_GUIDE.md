@@ -6,6 +6,7 @@ The vehicle repair workshop frontend was engineered using the **Repository Patte
 
 - `ICatalogRepository` (`src/features/catalog/repository/catalog.repository.interface.ts`)
 - `IWorkshopJobRepository` (`src/features/workshop/repository/workshop-job.repository.interface.ts`)
+- `IVehicleHistoryRepository` (`src/features/workshop/repository/vehicle-history.repository.interface.ts`)
 - `IPosSaleRepository` (`src/features/pos/repository/pos-sale.repository.interface.ts`)
 - `IPosShiftRepository` (`src/features/pos/repository/pos-shift.repository.interface.ts`)
 - `IFinanceRepository` (`src/features/finance-reports/repository/finance.repository.interface.ts`)
@@ -38,7 +39,10 @@ React UI components (such as `RepairSheetPage`, `WorkshopBoardPage`, `PosTermina
 | **Workshop** | `getById(id)` | `GET /api/v1/workshop/jobs/:id` | - | `WorkshopJobSheetDto` |
 | **Workshop** | `create(dto)` | `POST /api/v1/workshop/jobs` | `CreateWorkshopJobSheetDto` | `WorkshopJobSheetDto` |
 | **Workshop** | `update(id, dto)` | `PUT /api/v1/workshop/jobs/:id` | `UpdateWorkshopJobSheetDto` | `WorkshopJobSheetDto` |
+| **Workshop** | `convertStage(id, stage)` | `POST /api/v1/workshop/jobs/:id/convert-stage` | `{ targetStage, reason }` | `WorkshopJobSheetDto` |
 | **Workshop** | `recordPayment(id, dto)` | `POST /api/v1/workshop/jobs/:id/payments` | `RecordPaymentDto` | `WorkshopJobSheetDto` |
+| **Vehicle History** | `lookupByPlate(query)` | `GET /api/v1/workshop/jobs/lookup` | `?search=CAB-1234` | `{ records: VehicleHistoricalRecord[] }` |
+| **Vehicle History** | `getByExactPlate(plate)` | `GET /api/v1/workshop/jobs/lookup/:plate` | - | `VehicleHistoricalRecord` |
 | **POS** | `create(dto)` | `POST /api/v1/pos/sales` | `CreatePosSaleDto` | `PosSaleTransactionDto` |
 | **POS** | `openShift(dto)` | `POST /api/v1/pos/shifts/open` | `{ cashierId, cashierName, openingFloatRs }` | `PosShiftDto` |
 | **POS** | `closeShift(id, dto)` | `POST /api/v1/pos/shifts/:id/close` | `{ actualDrawerCashRs }` | `PosShiftDto` |

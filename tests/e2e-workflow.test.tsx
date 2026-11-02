@@ -1,9 +1,10 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import { AuthProvider } from '@/app/providers/AuthProvider';
 import { ToastProvider } from '@/components/ui/toast';
 import { WorkshopJobsPage } from '@/features/workshop/pages/WorkshopJobsPage';
+import { RepairSheetPage } from '@/features/workshop/pages/RepairSheetPage';
 import { workshopJobRepository } from '@/features/workshop/repository/workshop-job.repository.mock';
 import { catalogRepository } from '@/features/catalog/repository/catalog.repository.mock';
 import { posSaleRepository } from '@/features/pos/repository/pos-sale.repository.mock';
@@ -128,24 +129,15 @@ describe('Phase 10: Comprehensive End-to-End Workflow Integration Test Suite', (
     // -------------------------------------------------------------------------
     // 3. CONVERT TO JOB CARD: VERIFY FROZEN IMMUTABLE BASELINE ESTIMATE SNAPSHOT
     // -------------------------------------------------------------------------
-    const baselineSnapshot = JSON.stringify({
-      id: estimateJob.id,
-      jobNumber: estimateJob.jobNumber,
-      docStage: 'ESTIMATE',
-      grandTotalSalesRs: estimateJob.financials.grandTotalSalesRs,
-      lines: estimateJob.lines,
-      frozenAt: new Date().toISOString(),
-    });
-
-    const jobCardJob = await workshopJobRepository.update(estimateJob.id, {
-      docStage: 'JOB_CARD',
-      floorStatus: 'APPROVED_IN_PROGRESS',
-      originalEstimateSnapshot: baselineSnapshot,
-    });
+    const jobCardJob = await workshopJobRepository.convertStage(
+      estimateJob.id,
+      'JOB_CARD',
+      'Customer approved estimate - convert to Job Card'
+    );
 
     expect(jobCardJob.docStage).toBe('JOB_CARD');
-    expect(jobCardJob.floorStatus).toBe('APPROVED_IN_PROGRESS');
     expect(jobCardJob.originalEstimateSnapshot).toBeDefined();
+    expect(jobCardJob.auditLogs?.some((a) => a.toState === 'JOB_CARD')).toBe(true);
 
     const parsedSnapshot = JSON.parse(jobCardJob.originalEstimateSnapshot!);
     expect(parsedSnapshot.grandTotalSalesRs).toBe(75000);
@@ -376,5 +368,100 @@ describe('Phase 10: Comprehensive End-to-End Workflow Integration Test Suite', (
     const newSheetBtn = screen.getByTestId('create-new-sheet-btn');
     expect(newSheetBtn).toBeInTheDocument();
     expect(newSheetBtn).toHaveTextContent(/New Repair Sheet/i);
+  });
+
+  it('executes UI interactive stage progression on RepairSheetPage: Quotation -> Estimate -> Job Card -> Invoice -> Payment Readiness', async () => {
+    // Seed a job sheet in QUOTATION stage
+    const quotation = await workshopJobRepository.create({
+      jobNumber: 'JOB-2026-UI-E2E',
+      docStage: 'QUOTATION',
+      floorStatus: 'DRAFT',
+      paymentStatus: 'UNPAID',
+      header: {
+        date: '2026-11-02',
+        jobNumber: 'JOB-2026-UI-E2E',
+        vehicleNumber: 'WP KY-8877',
+        natureOfRepair: 'Rear Bumper & Tail Lamp',
+        vehicleMake: 'Honda',
+        vehicleModel: 'Grace',
+        chassisNumber: 'GM4-1002938',
+        yearOfMake: '2016',
+        daysForCompletion: '3 Days',
+        vehicleColor: 'White Pearl',
+        insuranceName: 'Ceylinco General Insurance',
+        customerInfo: 'Nimal Bandara - 077 123 4567',
+      },
+      lines: [
+        {
+          id: 'l-ui-1',
+          rowNo: 1,
+          category: 'LABOR_REMOVE_REASSEMBLE',
+          description: 'Rear Bumper Removal & Refit',
+          sellingPriceRs: 8000,
+          buyingCostRs: 2000,
+          assignedTechnician: 'Kamal',
+          isCompleted: false,
+        },
+      ],
+      discountRs: 0,
+      taxRs: 0,
+      insuranceApprovedRs: 0,
+      advancePaidRs: 0,
+    });
+
+    const router = createMemoryRouter(
+      [
+        {
+          path: '/workshop/sheet/:id',
+          element: <RepairSheetPage />,
+        },
+      ],
+      { initialEntries: [`/workshop/sheet/${quotation.id}`] }
+    );
+
+    render(
+      <ToastProvider>
+        <AuthProvider initialRole="OWNER">
+          <RouterProvider router={router} />
+        </AuthProvider>
+      </ToastProvider>
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId('repair-sheet-page')).toBeInTheDocument();
+    });
+
+    // 1. Initial QUOTATION stage
+    expect(screen.getByTestId('sheet-stage-badge')).toHaveTextContent(/Quotation/i);
+
+    // 2. Switch to ESTIMATE stage
+    const estimateToggleBtn = screen.getByTestId('stage-toggle-estimate');
+    fireEvent.click(estimateToggleBtn);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('sheet-stage-badge')).toHaveTextContent(/Estimate/i);
+    });
+
+    // 3. Convert to JOB_CARD
+    const convertToJobCardBtn = screen.getByTestId('convert-to-job-card-btn');
+    fireEvent.click(convertToJobCardBtn);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('sheet-stage-badge')).toHaveTextContent(/JOB_CARD/i);
+    });
+    // Frozen baseline estimate snapshot banner appears
+    expect(screen.getByTestId('snapshot-frozen-banner')).toBeInTheDocument();
+
+    // 4. Convert to INVOICE
+    const convertToInvoiceBtn = screen.getByTestId('convert-to-invoice-btn');
+    fireEvent.click(convertToInvoiceBtn);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('sheet-stage-badge')).toHaveTextContent(/Invoice/i);
+    });
+
+    // 5. Verify Collect Payment button is available
+    const collectPaymentBtn = screen.getByTestId('collect-payment-btn');
+    expect(collectPaymentBtn).toBeInTheDocument();
   });
 });
