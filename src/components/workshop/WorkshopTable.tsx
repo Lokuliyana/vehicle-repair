@@ -80,6 +80,7 @@ export function WorkshopTable({
       buyingCostRs: 0,
       assignedTechnician: '',
       isCompleted: false,
+      isSupplementary: isJobCardMode,
     };
 
     pendingFocusRowIdRef.current = newId;
@@ -304,20 +305,30 @@ export function WorkshopTable({
 
                     {/* Description */}
                     <td className="px-2 py-1 border-r border-slate-200">
-                      <Input
-                        ref={(el) => {
-                          if (el) descInputRefs.current.set(item.id, el);
-                          else descInputRefs.current.delete(item.id);
-                        }}
-                        value={item.description}
-                        onChange={(e) =>
-                          handleUpdateItem(item.id, 'description', e.target.value)
-                        }
-                        onKeyDown={(e) => handleCellKeyDown(e, 'desc', idx, item)}
-                        placeholder="Enter repair or replacement item description..."
-                        className="h-8 text-xs border-slate-300 focus-visible:ring-1 focus-visible:ring-slate-600"
-                        data-testid={`desc-input-${item.id}`}
-                      />
+                      <div className="flex items-center gap-1.5">
+                        {item.isSupplementary && (
+                          <span
+                            className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300 shrink-0 uppercase tracking-tight"
+                            data-testid={`supplementary-badge-${item.id}`}
+                          >
+                            Supplementary
+                          </span>
+                        )}
+                        <Input
+                          ref={(el) => {
+                            if (el) descInputRefs.current.set(item.id, el);
+                            else descInputRefs.current.delete(item.id);
+                          }}
+                          value={item.description}
+                          onChange={(e) =>
+                            handleUpdateItem(item.id, 'description', e.target.value)
+                          }
+                          onKeyDown={(e) => handleCellKeyDown(e, 'desc', idx, item)}
+                          placeholder="Enter repair or replacement item description..."
+                          className="h-8 text-xs border-slate-300 focus-visible:ring-1 focus-visible:ring-slate-600"
+                          data-testid={`desc-input-${item.id}`}
+                        />
+                      </div>
                     </td>
 
                     {isJobCardMode ? (
@@ -443,7 +454,10 @@ export function WorkshopTable({
                   className="h-7 text-xs border-dashed border-slate-400 text-slate-700 hover:border-slate-600 hover:bg-slate-100"
                   data-testid={`add-row-btn-${category}`}
                 >
-                  <Plus className="mr-1 h-3.5 w-3.5" /> Add Row (or press Enter in amount)
+                  <Plus className="mr-1 h-3.5 w-3.5" />{' '}
+                  {isJobCardMode
+                    ? '+ Add Supplementary Item'
+                    : 'Add Row (or press Enter in amount)'}
                 </Button>
               </td>
 

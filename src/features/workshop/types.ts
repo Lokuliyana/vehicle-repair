@@ -66,6 +66,30 @@ export interface WorkshopLineItem {
   buyingCostRs: number;
   assignedTechnician?: string;
   isCompleted: boolean;
+  isSupplementary?: boolean;
+}
+
+export interface AuditLogEntry {
+  id: string;
+  timestamp: string;
+  actor: string;
+  action: 'STAGE_CONVERSION' | 'STATUS_ADVANCEMENT' | 'TASK_COMPLETION' | 'LINE_ITEM_ADDED' | string;
+  fromState?: string;
+  toState?: string;
+  comment?: string;
+}
+
+export interface OriginalEstimateSnapshotData {
+  lines: WorkshopLineItem[];
+  financials: WorkshopFinancialSummary;
+  grandTotalSalesRs: number;
+  subtotalRemoveReassembleRs: number;
+  subtotalRepairRs: number;
+  subtotalReplacementRs: number;
+  discountRs: number;
+  taxRs: number;
+  frozenAt: string;
+  stage: DocumentStage;
 }
 
 export interface WorkshopFinancialSummary {
@@ -94,6 +118,7 @@ export interface WorkshopJobSheet {
   lines: WorkshopLineItem[];
   financials: WorkshopFinancialSummary;
   originalEstimateSnapshot?: string;
+  auditLogs?: AuditLogEntry[];
   createdAt: string;
   updatedAt: string;
 }
@@ -110,6 +135,7 @@ export interface CreateWorkshopJobSheetDto {
   insuranceApprovedRs?: number;
   advancePaidRs?: number;
   originalEstimateSnapshot?: string;
+  auditLogs?: AuditLogEntry[];
 }
 
 export interface UpdateWorkshopJobSheetDto {
@@ -124,6 +150,7 @@ export interface UpdateWorkshopJobSheetDto {
   insuranceApprovedRs?: number;
   advancePaidRs?: number;
   originalEstimateSnapshot?: string;
+  auditLogs?: AuditLogEntry[];
 }
 
 export interface WorkshopJobFilter {

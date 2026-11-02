@@ -178,7 +178,14 @@ export const A4WorkshopPrint = React.forwardRef<HTMLDivElement, A4WorkshopPrintP
                 removeReassembleLines.map((line, idx) => (
                   <tr key={line.id} className="border-b border-black">
                     <td className="border-r border-black p-1 text-center">{idx + 1}</td>
-                    <td className="border-r border-black p-1 break-words">{line.description}</td>
+                    <td className="border-r border-black p-1 break-words">
+                      {line.isSupplementary && (
+                        <span className="mr-1 font-bold uppercase text-[9px] border border-black px-1 py-0.5 rounded bg-gray-100">
+                          [Supplementary]
+                        </span>
+                      )}
+                      {line.description}
+                    </td>
                     {isJobCard ? (
                       <>
                         <td className="border-r border-black p-1">{line.assignedTechnician || '-'}</td>
@@ -243,7 +250,14 @@ export const A4WorkshopPrint = React.forwardRef<HTMLDivElement, A4WorkshopPrintP
                 repairLines.map((line, idx) => (
                   <tr key={line.id} className="border-b border-black">
                     <td className="border-r border-black p-1 text-center">{idx + 1}</td>
-                    <td className="border-r border-black p-1 break-words">{line.description}</td>
+                    <td className="border-r border-black p-1 break-words">
+                      {line.isSupplementary && (
+                        <span className="mr-1 font-bold uppercase text-[9px] border border-black px-1 py-0.5 rounded bg-gray-100">
+                          [Supplementary]
+                        </span>
+                      )}
+                      {line.description}
+                    </td>
                     {isJobCard ? (
                       <>
                         <td className="border-r border-black p-1">{line.assignedTechnician || '-'}</td>
@@ -308,7 +322,14 @@ export const A4WorkshopPrint = React.forwardRef<HTMLDivElement, A4WorkshopPrintP
                 replacementLines.map((line, idx) => (
                   <tr key={line.id} className="border-b border-black">
                     <td className="border-r border-black p-1 text-center">{idx + 1}</td>
-                    <td className="border-r border-black p-1 break-words">{line.description}</td>
+                    <td className="border-r border-black p-1 break-words">
+                      {line.isSupplementary && (
+                        <span className="mr-1 font-bold uppercase text-[9px] border border-black px-1 py-0.5 rounded bg-gray-100">
+                          [Supplementary]
+                        </span>
+                      )}
+                      {line.description}
+                    </td>
                     {isJobCard ? (
                       <>
                         <td className="border-r border-black p-1">{line.assignedTechnician || '-'}</td>
@@ -422,7 +443,9 @@ export const A4WorkshopPrint = React.forwardRef<HTMLDivElement, A4WorkshopPrintP
         {/* Bottom Disclaimers */}
         <div className="print-footer mt-auto pt-4 border-t border-black text-center space-y-1">
           <p className="text-[10px] italic text-gray-700">
-            Computer generated estimate and does not carry a signature.
+            {isJobCard
+              ? 'Workshop Floor Physical Job Card. Return signed document to service desk upon task completion.'
+              : 'Computer generated estimate and does not carry a signature.'}
           </p>
           <p className="text-[12px] font-bold tracking-[0.3em] uppercase text-black pt-1">
             T H A N K &nbsp; Y O U

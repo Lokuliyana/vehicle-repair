@@ -10,6 +10,8 @@ import {
   RefreshCw,
   Sparkles,
   Shield,
+  Clock,
+  CheckCircle2,
 } from 'lucide-react';
 import {
   WorkshopJobSheet,
@@ -19,6 +21,7 @@ import {
   RepairLineCategory,
   CatalogItem,
   VehicleHistoricalRecord,
+  AuditLogEntry,
 } from '@/types';
 import { calculateWorkshopFinancials, formatRs } from '@/utils/currency';
 import { useAuth } from '@/app/providers/AuthProvider';
@@ -62,7 +65,7 @@ const INSURANCE_PRESETS = [
 export function RepairSheetPage() {
   const { id } = useParams<{ id?: string }>();
   const navigate = useNavigate();
-  const { permissions, isCostProfitVisible } = useAuth();
+  const { role, user, permissions, isCostProfitVisible } = useAuth();
   const { toast } = useToast();
 
   const [isLoading, setIsLoading] = useState(true);
@@ -95,6 +98,7 @@ export function RepairSheetPage() {
   const [insuranceApprovedRs, setInsuranceApprovedRs] = useState<number>(0);
   const [advancePaidRs, setAdvancePaidRs] = useState<number>(0);
   const [originalSnapshot, setOriginalSnapshot] = useState<string | undefined>();
+  const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
 
   // Fetch or initialize job sheet
   useEffect(() => {
@@ -127,6 +131,7 @@ export function RepairSheetPage() {
             setInsuranceApprovedRs(existing.financials?.insuranceApprovedRs || 0);
             setAdvancePaidRs(existing.financials?.advancePaidRs || 0);
             setOriginalSnapshot(existing.originalEstimateSnapshot);
+            setAuditLogs(existing.auditLogs || []);
             setIsLoading(false);
             return;
           }
@@ -156,6 +161,7 @@ export function RepairSheetPage() {
           setInsuranceApprovedRs(0);
           setAdvancePaidRs(0);
           setOriginalSnapshot(undefined);
+          setAuditLogs([]);
           setIsLoading(false);
         }
       } catch (err) {
@@ -217,6 +223,7 @@ export function RepairSheetPage() {
     }
 
     const sectionItems = lines.filter((l) => l.category === targetCategory);
+    const isSupplementary = Boolean(originalSnapshot || docStage === 'JOB_CARD');
     const newLine: WorkshopLineItem = {
       id: `item-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       rowNo: sectionItems.length + 1,
@@ -227,6 +234,7 @@ export function RepairSheetPage() {
       buyingCostRs: item.buyingCostRs,
       assignedTechnician: '',
       isCompleted: false,
+      isSupplementary,
     };
 
     // Insert cleanly in group
@@ -254,7 +262,9 @@ export function RepairSheetPage() {
     setLines(renumbered);
     toast({
       title: 'Preset Added',
-      message: `Added "${item.name}" to ${targetCategory.replace(/_/g, ' ')}`,
+      message: `Added "${item.name}" to ${targetCategory.replace(/_/g, ' ')}${
+        isSupplementary ? ' (Supplementary)' : ''
+      }`,
       type: 'success',
     });
   };
@@ -262,6 +272,7 @@ export function RepairSheetPage() {
   const handleAddCustomCatalogItem = (customDesc: string) => {
     const targetCategory: RepairLineCategory = 'REPLACEMENT';
     const sectionItems = lines.filter((l) => l.category === targetCategory);
+    const isSupplementary = Boolean(originalSnapshot || docStage === 'JOB_CARD');
     const newLine: WorkshopLineItem = {
       id: `item-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       rowNo: sectionItems.length + 1,
@@ -271,28 +282,30 @@ export function RepairSheetPage() {
       buyingCostRs: 0,
       assignedTechnician: '',
       isCompleted: false,
+      isSupplementary,
     };
     setLines([...lines, newLine]);
     toast({
       title: 'Custom Item Added',
-      message: `Added custom line "${customDesc}". Please enter the selling price.`,
+      message: `Added custom line "${customDesc}". Please enter the selling price.${
+        isSupplementary ? ' (Supplementary)' : ''
+      }`,
       type: 'info',
     });
   };
 
-  // Convert Document Stage
-  const handleStageTransition = (newStage: DocumentStage) => {
-    if (newStage === docStage) return;
+  // 1-Click Conversion to Job Card with immutable estimate snapshot
+  const handleConvertToJobCard = async () => {
+    if (docStage === 'JOB_CARD') return;
 
-    // Snapshot locking rule for Estimate / Quotation -> Job Card
     let snapshot = originalSnapshot;
-    if ((docStage === 'ESTIMATE' || docStage === 'QUOTATION') && newStage === 'JOB_CARD' && !originalSnapshot) {
-      const currentSheetToLock: WorkshopJobSheet = {
+    if (!snapshot) {
+      const snapshotData = {
         id: currentId || 'temp-id',
         jobNumber,
         docStage,
         floorStatus,
-        paymentStatus: 'UNPAID',
+        paymentStatus: 'UNPAID' as const,
         header: {
           date,
           jobNumber,
@@ -307,19 +320,120 @@ export function RepairSheetPage() {
           insuranceName,
           customerInfo,
         },
-        lines,
-        financials,
+        lines: JSON.parse(JSON.stringify(lines)),
+        financials: { ...financials },
+        subtotalRemoveReassembleRs: financials.subtotalRemoveReassembleRs,
+        subtotalRepairRs: financials.subtotalRepairRs,
+        subtotalReplacementRs: financials.subtotalReplacementRs,
+        grandTotalSalesRs: financials.grandTotalSalesRs,
+        discountRs,
+        taxRs,
+        frozenAt: new Date().toISOString(),
+        stage: docStage,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
-      snapshot = JSON.stringify(currentSheetToLock);
+      snapshot = JSON.stringify(snapshotData);
       setOriginalSnapshot(snapshot);
     }
+
+    const nextFloorStatus: WorkshopFloorStatus = 'APPROVED_IN_PROGRESS';
+    const auditEntry: AuditLogEntry = {
+      id: `audit-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      timestamp: new Date().toISOString(),
+      actor: user?.name || role,
+      action: 'STAGE_CONVERSION',
+      fromState: docStage,
+      toState: 'JOB_CARD',
+      comment: `1-Click conversion from ${docStage} to Job Card. Baseline estimate frozen at Rs. ${financials.grandTotalSalesRs}.`,
+    };
+
+    const updatedLogs = [...auditLogs, auditEntry];
+    setAuditLogs(updatedLogs);
+    setDocStage('JOB_CARD');
+    setFloorStatus(nextFloorStatus);
+
+    if (currentId) {
+      try {
+        await workshopJobRepository.update(currentId, {
+          docStage: 'JOB_CARD',
+          floorStatus: nextFloorStatus,
+          originalEstimateSnapshot: snapshot,
+          auditLogs: updatedLogs,
+        });
+      } catch (err) {
+        console.error('Failed to sync job card conversion to repository:', err);
+      }
+    }
+
+    toast({
+      title: 'Converted to Job Card',
+      message: 'Document converted to Job Card. Baseline estimate frozen; status set to In Progress.',
+      type: 'success',
+    });
+  };
+
+  // Convert Document Stage
+  const handleStageTransition = (newStage: DocumentStage) => {
+    if (newStage === docStage) return;
+
+    // Snapshot locking rule for Estimate / Quotation -> Job Card
+    let snapshot = originalSnapshot;
+    if ((docStage === 'ESTIMATE' || docStage === 'QUOTATION') && newStage === 'JOB_CARD' && !originalSnapshot) {
+      const snapshotData = {
+        id: currentId || 'temp-id',
+        jobNumber,
+        docStage,
+        floorStatus,
+        paymentStatus: 'UNPAID' as const,
+        header: {
+          date,
+          jobNumber,
+          vehicleNumber,
+          natureOfRepair,
+          vehicleMake,
+          chassisNumber,
+          vehicleModel,
+          daysForCompletion,
+          yearOfMake,
+          vehicleColor,
+          insuranceName,
+          customerInfo,
+        },
+        lines: JSON.parse(JSON.stringify(lines)),
+        financials: { ...financials },
+        subtotalRemoveReassembleRs: financials.subtotalRemoveReassembleRs,
+        subtotalRepairRs: financials.subtotalRepairRs,
+        subtotalReplacementRs: financials.subtotalReplacementRs,
+        grandTotalSalesRs: financials.grandTotalSalesRs,
+        discountRs,
+        taxRs,
+        frozenAt: new Date().toISOString(),
+        stage: docStage,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      snapshot = JSON.stringify(snapshotData);
+      setOriginalSnapshot(snapshot);
+    }
+
+    const auditEntry: AuditLogEntry = {
+      id: `audit-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      timestamp: new Date().toISOString(),
+      actor: user?.name || role,
+      action: 'STAGE_CONVERSION',
+      fromState: docStage,
+      toState: newStage,
+      comment: `Document stage converted from ${docStage} to ${newStage}.${
+        newStage === 'JOB_CARD' ? ' Baseline estimate snapshot frozen.' : ''
+      }`,
+    };
+    setAuditLogs((prev) => [...prev, auditEntry]);
 
     setDocStage(newStage);
 
     // Contextual floor status adjustment
-    if (newStage === 'JOB_CARD' && floorStatus === 'DRAFT') {
+    if (newStage === 'JOB_CARD' && (floorStatus === 'DRAFT' || floorStatus === 'PENDING_INSURANCE_APPROVAL')) {
       setFloorStatus('APPROVED_IN_PROGRESS');
     } else if (newStage === 'INVOICE' && floorStatus !== 'COMPLETED_DELIVERED') {
       setFloorStatus('READY_FOR_DELIVERY');
@@ -373,6 +487,7 @@ export function RepairSheetPage() {
           insuranceApprovedRs,
           advancePaidRs,
           originalEstimateSnapshot: originalSnapshot,
+          auditLogs,
         });
         setCurrentId(updated.id);
         toast({
@@ -394,6 +509,7 @@ export function RepairSheetPage() {
           insuranceApprovedRs,
           advancePaidRs,
           originalEstimateSnapshot: originalSnapshot,
+          auditLogs,
         });
         setCurrentId(created.id);
         setJobNumber(created.jobNumber);
@@ -441,6 +557,7 @@ export function RepairSheetPage() {
       lines,
       financials,
       originalEstimateSnapshot: originalSnapshot,
+      auditLogs,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -463,6 +580,7 @@ export function RepairSheetPage() {
     lines,
     financials,
     originalSnapshot,
+    auditLogs,
   ]);
 
   const handleShareWhatsApp = () => {
@@ -486,7 +604,7 @@ export function RepairSheetPage() {
   }
 
   const canShowCostProfit = isCostProfitVisible && permissions.canViewCosts && permissions.canViewGrossProfit;
-  const isJobCardMode = docStage === 'JOB_CARD';
+  const isJobCardMode = docStage === 'JOB_CARD' || role === 'TECHNICIAN';
 
   return (
     <div
@@ -533,27 +651,44 @@ export function RepairSheetPage() {
 
         {/* Right Actions: Conversion buttons, Print, WhatsApp, Save */}
         <div className="flex flex-wrap items-center gap-2">
-          {/* Document Stage Conversion Selector */}
-          <div className="flex items-center bg-slate-100 rounded-lg p-0.5 border border-slate-200">
-            {(['QUOTATION', 'ESTIMATE', 'JOB_CARD', 'INVOICE'] as DocumentStage[]).map(
-              (stage) => (
-                <button
-                  key={stage}
-                  type="button"
-                  onClick={() => handleStageTransition(stage)}
-                  className={cn(
-                    'px-2.5 py-1 text-xs font-semibold rounded-md transition-all cursor-pointer',
-                    docStage === stage
-                      ? 'bg-white text-slate-900 shadow-2xs'
-                      : 'text-slate-600 hover:text-slate-900'
-                  )}
-                  data-testid={`stage-toggle-${stage.toLowerCase()}`}
-                >
-                  {stage === 'JOB_CARD' ? 'Job Card' : stage.charAt(0) + stage.slice(1).toLowerCase()}
-                </button>
-              )
-            )}
-          </div>
+          {/* 1-Click Conversion to Job Card button (Authorized Roles Only) */}
+          {role !== 'TECHNICIAN' && permissions.canManageJobCards && (docStage === 'QUOTATION' || docStage === 'ESTIMATE') && (
+            <Button
+              type="button"
+              variant="default"
+              size="sm"
+              onClick={handleConvertToJobCard}
+              className="text-xs h-8 bg-blue-600 hover:bg-blue-700 text-white font-bold gap-1.5 shadow-xs"
+              data-testid="convert-to-job-card-btn"
+            >
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              <span>Convert to Job Card</span>
+            </Button>
+          )}
+
+          {/* Document Stage Conversion Selector (Authorized Roles Only) */}
+          {role !== 'TECHNICIAN' && permissions.canManageJobCards && (
+            <div className="flex items-center bg-slate-100 rounded-lg p-0.5 border border-slate-200">
+              {(['QUOTATION', 'ESTIMATE', 'JOB_CARD', 'INVOICE'] as DocumentStage[]).map(
+                (stage) => (
+                  <button
+                    key={stage}
+                    type="button"
+                    onClick={() => handleStageTransition(stage)}
+                    className={cn(
+                      'px-2.5 py-1 text-xs font-semibold rounded-md transition-all cursor-pointer',
+                      docStage === stage
+                        ? 'bg-white text-slate-900 shadow-2xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    )}
+                    data-testid={`stage-toggle-${stage.toLowerCase()}`}
+                  >
+                    {stage === 'JOB_CARD' ? 'Job Card' : stage.charAt(0) + stage.slice(1).toLowerCase()}
+                  </button>
+                )
+              )}
+            </div>
+          )}
 
           <Button
             type="button"
@@ -593,6 +728,39 @@ export function RepairSheetPage() {
           </Button>
         </div>
       </div>
+
+      {/* Original Estimate Snapshot Frozen Banner */}
+      {originalSnapshot && (
+        <div
+          className="bg-blue-50 border border-blue-200 rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-blue-900 no-print shadow-xs"
+          data-testid="snapshot-frozen-banner"
+        >
+          <div className="flex items-center gap-2.5">
+            <Lock className="w-4 h-4 text-blue-600 shrink-0" />
+            <div>
+              <span className="font-bold">Original Estimate Baseline Snapshot Frozen:</span>{' '}
+              <span className="text-blue-800">
+                Immutable baseline locked upon Job Card conversion. Supplementary items added after conversion are badged.
+              </span>
+            </div>
+          </div>
+          {(() => {
+            try {
+              const parsed = JSON.parse(originalSnapshot);
+              const origTotal = parsed.grandTotalSalesRs ?? parsed.financials?.grandTotalSalesRs ?? 0;
+              const origCount = parsed.lines?.length ?? 0;
+              return (
+                <div className="flex items-center gap-2 shrink-0 font-mono text-[11px] bg-white px-2.5 py-1 rounded border border-blue-200 shadow-2xs">
+                  <span>Baseline Total: <strong className="text-slate-900">{formatRs(origTotal)}</strong></span>
+                  <span className="text-slate-500">({origCount} items)</span>
+                </div>
+              );
+            } catch {
+              return null;
+            }
+          })()}
+        </div>
+      )}
 
       {/* 12-Field Vehicle / Insurance / Customer Header Form Grid */}
       <div
@@ -874,150 +1042,199 @@ export function RepairSheetPage() {
 
       {/* Financials & Embedded Profit Summary */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 no-print">
-        {/* Customer & Insurance Settlement Card */}
-        <div className="bg-white rounded-xl border border-slate-300 p-5 shadow-xs space-y-4">
-          <h3 className="text-xs font-black uppercase tracking-wider text-slate-800 border-b border-slate-200 pb-2">
-            Invoice & Settlement Summary
-          </h3>
-
-          <div className="space-y-2 text-xs">
-            <div className="flex justify-between py-1 border-b border-slate-100">
-              <span className="text-slate-600">Sub Total (Remove & Reassemble):</span>
-              <span className="font-semibold text-slate-900">
-                {formatRs(financials.subtotalRemoveReassembleRs)}
-              </span>
-            </div>
-            <div className="flex justify-between py-1 border-b border-slate-100">
-              <span className="text-slate-600">Sub Total (Repair):</span>
-              <span className="font-semibold text-slate-900">
-                {formatRs(financials.subtotalRepairRs)}
-              </span>
-            </div>
-            <div className="flex justify-between py-1 border-b border-slate-100">
-              <span className="text-slate-600">Sub Total (Replacement):</span>
-              <span className="font-semibold text-slate-900">
-                {formatRs(financials.subtotalReplacementRs)}
-              </span>
-            </div>
-            <div className="flex justify-between py-1.5 font-bold border-b border-slate-200 text-slate-800">
-              <span>Gross Sales:</span>
-              <span>
-                {formatRs(
-                  financials.subtotalRemoveReassembleRs +
-                    financials.subtotalRepairRs +
-                    financials.subtotalReplacementRs
-                )}
-              </span>
+        {role === 'TECHNICIAN' ? (
+          <div
+            className="bg-white rounded-xl border border-slate-300 p-5 shadow-xs space-y-4"
+            data-testid="technician-progress-panel"
+          >
+            <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+              <h3 className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                Technician Work Order Progress
+              </h3>
+              <Badge variant="info" className="text-[10px] font-bold">
+                FLOOR VIEW
+              </Badge>
             </div>
 
-            {/* Discount & Tax inputs */}
-            <div className="grid grid-cols-2 gap-3 py-1">
-              <div>
-                <label className="block text-[11px] font-medium text-slate-600">
-                  Discount (Rs.):
-                </label>
-                <Input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={discountRs === 0 ? '' : discountRs}
-                  onChange={(e) => setDiscountRs(parseFloat(e.target.value) || 0)}
-                  placeholder="0.00"
-                  className="h-8 text-xs text-right text-red-700"
-                  data-testid="finance-discount-input"
+            <div className="space-y-3 text-xs">
+              <div className="flex justify-between py-1 border-b border-slate-100">
+                <span className="text-slate-600 font-medium">Nature of Repair:</span>
+                <span className="font-bold text-slate-900">{natureOfRepair || '-'}</span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-slate-100">
+                <span className="text-slate-600 font-medium">Target Completion:</span>
+                <span className="font-bold text-slate-900">{daysForCompletion || '-'}</span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-slate-100">
+                <span className="text-slate-600 font-medium">Tasks Completion:</span>
+                <span className="font-bold text-emerald-700">
+                  {lines.filter((l) => l.isCompleted).length} / {lines.length} Tasks Done (
+                  {lines.length > 0
+                    ? Math.round((lines.filter((l) => l.isCompleted).length / lines.length) * 100)
+                    : 0}
+                  %)
+                </span>
+              </div>
+              <div className="w-full bg-slate-200 rounded-full h-2.5 overflow-hidden">
+                <div
+                  className="bg-emerald-600 h-2.5 rounded-full transition-all"
+                  style={{
+                    width: `${lines.length > 0 ? (lines.filter((l) => l.isCompleted).length / lines.length) * 100 : 0}%`,
+                  }}
                 />
               </div>
-              <div>
-                <label className="block text-[11px] font-medium text-slate-600">
-                  Tax / VAT (Rs.):
-                </label>
-                <Input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={taxRs === 0 ? '' : taxRs}
-                  onChange={(e) => setTaxRs(parseFloat(e.target.value) || 0)}
-                  placeholder="0.00"
-                  className="h-8 text-xs text-right"
-                  data-testid="finance-tax-input"
-                />
-              </div>
+              <p className="text-[11px] text-slate-500 italic pt-1">
+                Prices and financial margins are redacted for workshop floor security. Mark tasks complete as you finish.
+              </p>
             </div>
+          </div>
+        ) : (
+          /* Customer & Insurance Settlement Card */
+          <div className="bg-white rounded-xl border border-slate-300 p-5 shadow-xs space-y-4">
+            <h3 className="text-xs font-black uppercase tracking-wider text-slate-800 border-b border-slate-200 pb-2">
+              Invoice & Settlement Summary
+            </h3>
 
-            <div className="flex justify-between py-2 border-t-2 border-slate-900 bg-slate-50 px-2 rounded font-black text-sm text-slate-900">
-              <span>Grand Total Sales:</span>
-              <span className="text-emerald-700" data-testid="grand-total-amount">
-                {formatRs(financials.grandTotalSalesRs)}
-              </span>
-            </div>
-
-            {/* Insurance Split Billing */}
-            <div className="pt-3 border-t border-slate-200 space-y-2">
-              <div className="text-[11px] font-bold uppercase tracking-wider text-blue-900">
-                Insurance Split Billing
+            <div className="space-y-2 text-xs">
+              <div className="flex justify-between py-1 border-b border-slate-100">
+                <span className="text-slate-600">Sub Total (Remove & Reassemble):</span>
+                <span className="font-semibold text-slate-900">
+                  {formatRs(financials.subtotalRemoveReassembleRs)}
+                </span>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="flex justify-between py-1 border-b border-slate-100">
+                <span className="text-slate-600">Sub Total (Repair):</span>
+                <span className="font-semibold text-slate-900">
+                  {formatRs(financials.subtotalRepairRs)}
+                </span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-slate-100">
+                <span className="text-slate-600">Sub Total (Replacement):</span>
+                <span className="font-semibold text-slate-900">
+                  {formatRs(financials.subtotalReplacementRs)}
+                </span>
+              </div>
+              <div className="flex justify-between py-1.5 font-bold border-b border-slate-200 text-slate-800">
+                <span>Gross Sales:</span>
+                <span>
+                  {formatRs(
+                    financials.subtotalRemoveReassembleRs +
+                      financials.subtotalRepairRs +
+                      financials.subtotalReplacementRs
+                  )}
+                </span>
+              </div>
+
+              {/* Discount & Tax inputs */}
+              <div className="grid grid-cols-2 gap-3 py-1">
                 <div>
                   <label className="block text-[11px] font-medium text-slate-600">
-                    Insurance Approved:
+                    Discount (Rs.):
                   </label>
                   <Input
                     type="number"
                     min="0"
                     step="0.01"
-                    value={insuranceApprovedRs === 0 ? '' : insuranceApprovedRs}
-                    onChange={(e) => setInsuranceApprovedRs(parseFloat(e.target.value) || 0)}
+                    value={discountRs === 0 ? '' : discountRs}
+                    onChange={(e) => setDiscountRs(parseFloat(e.target.value) || 0)}
                     placeholder="0.00"
-                    className="h-8 text-xs text-right text-blue-900 font-semibold"
-                    data-testid="finance-insurance-approved-input"
+                    className="h-8 text-xs text-right text-red-700"
+                    data-testid="finance-discount-input"
                   />
                 </div>
                 <div>
                   <label className="block text-[11px] font-medium text-slate-600">
-                    Customer Excess / Payable:
+                    Tax / VAT (Rs.):
                   </label>
-                  <div className="h-8 px-2 flex items-center justify-end rounded border border-slate-200 bg-slate-50 font-bold text-slate-900">
-                    {formatRs(financials.customerPayableRs)}
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={taxRs === 0 ? '' : taxRs}
+                    onChange={(e) => setTaxRs(parseFloat(e.target.value) || 0)}
+                    placeholder="0.00"
+                    className="h-8 text-xs text-right"
+                    data-testid="finance-tax-input"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-between py-2 border-t-2 border-slate-900 bg-slate-50 px-2 rounded font-black text-sm text-slate-900">
+                <span>Grand Total Sales:</span>
+                <span className="text-emerald-700" data-testid="grand-total-amount">
+                  {formatRs(financials.grandTotalSalesRs)}
+                </span>
+              </div>
+
+              {/* Insurance Split Billing */}
+              <div className="pt-3 border-t border-slate-200 space-y-2">
+                <div className="text-[11px] font-bold uppercase tracking-wider text-blue-900">
+                  Insurance Split Billing
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-medium text-slate-600">
+                      Insurance Approved:
+                    </label>
+                    <Input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={insuranceApprovedRs === 0 ? '' : insuranceApprovedRs}
+                      onChange={(e) => setInsuranceApprovedRs(parseFloat(e.target.value) || 0)}
+                      placeholder="0.00"
+                      className="h-8 text-xs text-right text-blue-900 font-semibold"
+                      data-testid="finance-insurance-approved-input"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-medium text-slate-600">
+                      Customer Excess / Payable:
+                    </label>
+                    <div className="h-8 px-2 flex items-center justify-end rounded border border-slate-200 bg-slate-50 font-bold text-slate-900">
+                      {formatRs(financials.customerPayableRs)}
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              <div className="grid grid-cols-2 gap-3 pt-1">
-                <div>
-                  <label className="block text-[11px] font-medium text-slate-600">
-                    Advance Paid:
-                  </label>
-                  <Input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={advancePaidRs === 0 ? '' : advancePaidRs}
-                    onChange={(e) => setAdvancePaidRs(parseFloat(e.target.value) || 0)}
-                    placeholder="0.00"
-                    className="h-8 text-xs text-right text-emerald-800 font-medium"
-                    data-testid="finance-advance-paid-input"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[11px] font-medium text-slate-600">
-                    Balance Due:
-                  </label>
-                  <div
-                    className={cn(
-                      'h-8 px-2 flex items-center justify-end rounded border font-black',
-                      financials.balanceDueRs > 0
-                        ? 'border-amber-300 bg-amber-50 text-amber-950'
-                        : 'border-slate-200 bg-slate-50 text-slate-700'
-                    )}
-                    data-testid="finance-balance-due-display"
-                  >
-                    {formatRs(financials.balanceDueRs)}
+                <div className="grid grid-cols-2 gap-3 pt-1">
+                  <div>
+                    <label className="block text-[11px] font-medium text-slate-600">
+                      Advance Paid:
+                    </label>
+                    <Input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={advancePaidRs === 0 ? '' : advancePaidRs}
+                      onChange={(e) => setAdvancePaidRs(parseFloat(e.target.value) || 0)}
+                      placeholder="0.00"
+                      className="h-8 text-xs text-right text-emerald-800 font-medium"
+                      data-testid="finance-advance-paid-input"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-medium text-slate-600">
+                      Balance Due:
+                    </label>
+                    <div
+                      className={cn(
+                        'h-8 px-2 flex items-center justify-end rounded border font-black',
+                        financials.balanceDueRs > 0
+                          ? 'border-amber-300 bg-amber-50 text-amber-950'
+                          : 'border-slate-200 bg-slate-50 text-slate-700'
+                      )}
+                      data-testid="finance-balance-due-display"
+                    >
+                      {formatRs(financials.balanceDueRs)}
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
+        )}
 
         {/* Cost & Gross Profit Card (Visible ONLY for Owner / Manager when toggle is ON) */}
         {isCostProfitVisible && permissions.canViewCosts && permissions.canViewGrossProfit ? (
@@ -1098,6 +1315,41 @@ export function RepairSheetPage() {
           </div>
         )}
       </div>
+
+      {/* Audit Trail & Operational History */}
+      {auditLogs && auditLogs.length > 0 && (
+        <div
+          className="bg-white rounded-xl border border-slate-200 p-5 shadow-xs space-y-3 no-print"
+          data-testid="audit-trail-panel"
+        >
+          <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+            <h3 className="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+              <Clock className="w-3.5 h-3.5 text-slate-500" />
+              Audit Trail & Operational History ({auditLogs.length})
+            </h3>
+          </div>
+          <div className="divide-y divide-slate-100 max-h-48 overflow-y-auto text-xs">
+            {auditLogs.map((log) => (
+              <div key={log.id} className="py-2 flex items-start justify-between gap-4">
+                <div className="space-y-0.5">
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="text-[10px] font-mono font-semibold">
+                      {log.action}
+                    </Badge>
+                    <span className="text-slate-600 text-[11px]">
+                      by <strong>{log.actor}</strong>
+                    </span>
+                  </div>
+                  {log.comment && <p className="text-[11px] text-slate-500">{log.comment}</p>}
+                </div>
+                <span className="text-[10px] text-slate-400 font-mono shrink-0">
+                  {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* A4 Print Modal / Document */}
       <Dialog open={isPrintModalOpen} onOpenChange={setIsPrintModalOpen}>

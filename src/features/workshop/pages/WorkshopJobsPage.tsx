@@ -10,6 +10,7 @@ import {
   ExternalLink,
   RefreshCw,
   Car,
+  CheckCircle2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -26,7 +27,9 @@ import {
   WorkshopJobSheet,
   DocumentStage,
   WorkshopFloorStatus,
+  AuditLogEntry,
 } from '@/types';
+import { useAuth } from '@/app/providers/AuthProvider';
 import { formatRs } from '@/utils/currency';
 import { workshopJobRepository } from '../repository/workshop-job.repository.mock';
 import { A4WorkshopPrint } from '@/components/print/A4WorkshopPrint';
@@ -34,6 +37,7 @@ import { buildWhatsAppShareUrl } from '@/utils/whatsapp';
 import { cn } from '@/utils/cn';
 
 export function WorkshopJobsPage() {
+  const { role, user, permissions } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const { toast } = useToast();
 
@@ -105,6 +109,61 @@ export function WorkshopJobsPage() {
       setRevision((r) => r + 1);
     } catch (err) {
       console.error('Reset error:', err);
+    }
+  };
+
+  const handleConvertToJobCard = async (job: WorkshopJobSheet) => {
+    try {
+      let snapshot = job.originalEstimateSnapshot;
+      if (!snapshot) {
+        const snapshotData = {
+          lines: JSON.parse(JSON.stringify(job.lines)),
+          financials: { ...job.financials },
+          grandTotalSalesRs: job.financials.grandTotalSalesRs,
+          subtotalRemoveReassembleRs: job.financials.subtotalRemoveReassembleRs,
+          subtotalRepairRs: job.financials.subtotalRepairRs,
+          subtotalReplacementRs: job.financials.subtotalReplacementRs,
+          discountRs: job.financials.discountRs || 0,
+          taxRs: job.financials.taxRs || 0,
+          frozenAt: new Date().toISOString(),
+          stage: job.docStage,
+        };
+        snapshot = JSON.stringify(snapshotData);
+      }
+
+      const auditEntry: AuditLogEntry = {
+        id: `audit-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+        timestamp: new Date().toISOString(),
+        actor: user?.name || role,
+        action: 'STAGE_CONVERSION',
+        fromState: job.docStage,
+        toState: 'JOB_CARD',
+        comment: `Converted from ${job.docStage} to Job Card. Baseline estimate frozen at Rs. ${job.financials.grandTotalSalesRs}.`,
+      };
+
+      const updatedLogs = [...(job.auditLogs || []), auditEntry];
+
+      await workshopJobRepository.update(job.id, {
+        docStage: 'JOB_CARD',
+        floorStatus: 'APPROVED_IN_PROGRESS',
+        originalEstimateSnapshot: snapshot,
+        auditLogs: updatedLogs,
+      });
+
+      toast({
+        title: 'Converted to Job Card',
+        message: `${job.jobNumber} successfully converted to Job Card.`,
+        type: 'success',
+      });
+
+      setRevision((r) => r + 1);
+    } catch (err) {
+      console.error('Job card conversion error:', err);
+      toast({
+        title: 'Conversion Failed',
+        message: 'Could not convert job to Job Card.',
+        type: 'error',
+      });
     }
   };
 
@@ -251,7 +310,9 @@ export function WorkshopJobsPage() {
                   <th className="py-2.5 px-3">Vehicle Details</th>
                   <th className="py-2.5 px-3">Customer & Insurance</th>
                   <th className="py-2.5 px-3">Stage & Status</th>
-                  <th className="py-2.5 px-3 text-right">Amount (Rs.)</th>
+                  {role !== 'TECHNICIAN' && (
+                    <th className="py-2.5 px-3 text-right">Amount (Rs.)</th>
+                  )}
                   <th className="py-2.5 px-3 text-center">Actions</th>
                 </tr>
               </thead>
@@ -315,14 +376,30 @@ export function WorkshopJobsPage() {
                       </div>
                     </td>
 
-                    {/* Amount */}
-                    <td className="py-3 px-3 align-top text-right font-black text-slate-900">
-                      {formatRs(job.financials?.grandTotalSalesRs || 0)}
-                    </td>
+                    {/* Amount (Hidden for TECHNICIAN) */}
+                    {role !== 'TECHNICIAN' && (
+                      <td className="py-3 px-3 align-top text-right font-black text-slate-900">
+                        {formatRs(job.financials?.grandTotalSalesRs || 0)}
+                      </td>
+                    )}
 
                     {/* Actions */}
                     <td className="py-3 px-3 align-top text-center">
                       <div className="flex items-center justify-center gap-1">
+                        {permissions.canManageJobCards && (job.docStage === 'QUOTATION' || job.docStage === 'ESTIMATE') && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleConvertToJobCard(job)}
+                            className="h-7 px-2 text-[10px] font-bold text-blue-700 border-blue-300 hover:bg-blue-50 gap-1"
+                            title="Convert to Job Card"
+                            data-testid={`convert-job-btn-${job.id}`}
+                          >
+                            <CheckCircle2 className="w-3 h-3 text-blue-600" />
+                            <span>Job Card</span>
+                          </Button>
+                        )}
+
                         <Link to={`/workshop/sheet/${job.id}`}>
                           <Button
                             variant="outline"
