@@ -32,6 +32,8 @@ export type UserRole =
   | 'CASHIER'
   | 'TECHNICIAN';
 
+export * from './auth';
+
 export interface WorkshopHeaderMetadata {
   date: string;
   jobNumber: string;
