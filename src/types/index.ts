@@ -8,6 +8,7 @@ export type UserRole =
 export * from './auth';
 export * from '@/features/catalog/types';
 export * from '@/features/workshop/types';
+export * from '@/features/finance-reports/types';
 export type {
   PaymentMethod,
   PosCartLine,
