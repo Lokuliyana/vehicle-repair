@@ -191,7 +191,7 @@ export function Header({
           <Button
             variant="default"
             size="sm"
-            onClick={() => navigate('/workshop/sheet/demo')}
+            onClick={() => navigate('/workshop/sheet')}
             className="text-xs h-8 bg-amber-600 hover:bg-amber-700 text-white font-semibold cursor-pointer shadow-xs gap-1"
             data-testid="quick-new-sheet-btn"
           >

@@ -1,8 +1,9 @@
-import { createBrowserRouter, Navigate } from 'react-router-dom';
+import { createBrowserRouter } from 'react-router-dom';
 import { AppShell } from './layout/AppShell';
 import { RoleDashboardPage } from '@/features/dashboard/pages/RoleDashboardPage';
 import { WorkshopJobsPage } from '@/features/workshop/pages/WorkshopJobsPage';
 import { WorkshopBoardPage } from '@/features/workshop/pages/WorkshopBoardPage';
+import { RepairSheetPage } from '@/features/workshop/pages/RepairSheetPage';
 import { InteractiveBenchPage } from '@/features/workshop/pages/InteractiveBenchPage';
 import { PosTerminalPage } from '@/features/pos/pages/PosTerminalPage';
 import { CatalogListPage } from '@/features/catalog/pages/CatalogListPage';
@@ -30,7 +31,11 @@ export const router = createBrowserRouter([
       },
       {
         path: 'workshop/sheet',
-        element: <Navigate to="/workshop/sheet/demo" replace />,
+        element: <RepairSheetPage />,
+      },
+      {
+        path: 'workshop/sheet/:id',
+        element: <RepairSheetPage />,
       },
       {
         path: 'workshop/sheet/demo',
