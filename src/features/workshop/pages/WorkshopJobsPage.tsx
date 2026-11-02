@@ -413,7 +413,7 @@ export function WorkshopJobsPage() {
               </div>
             </DialogHeader>
 
-            <div className="border border-slate-300 rounded shadow-inner p-2 sm:p-4 bg-slate-100 flex justify-center">
+            <div className="border border-slate-300 rounded shadow-inner p-2 sm:p-4 bg-slate-100 flex justify-center print:border-none print:shadow-none print:p-0 print:bg-transparent">
               <A4WorkshopPrint jobSheet={activePrintJob} />
             </div>
           </div>

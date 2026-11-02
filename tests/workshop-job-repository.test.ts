@@ -201,4 +201,76 @@ describe('WorkshopJobRepository & Domain Layer (Phase 4)', () => {
     expect(fetched).not.toBeNull();
     expect(fetched?.header.vehicleNumber).toBe('WP CAR-9999');
   });
+
+  it('preserves immutable originalEstimateSnapshot when job sheet is modified after transition', async () => {
+    const job = await repo.getByJobNumber('JOB-2026-0042');
+    expect(job).not.toBeNull();
+
+    // Baseline snapshot string
+    const baselineSnapshot = JSON.stringify({
+      jobNumber: job!.jobNumber,
+      stage: 'ESTIMATE',
+      itemsCount: job!.lines.length,
+      grandTotal: job!.financials.grandTotalSalesRs,
+    });
+
+    // Convert to JOB_CARD and attach snapshot
+    const transitioned = await repo.update(job!.id, {
+      docStage: 'JOB_CARD',
+      floorStatus: 'APPROVED_IN_PROGRESS',
+      originalEstimateSnapshot: baselineSnapshot,
+    });
+    expect(transitioned.originalEstimateSnapshot).toBe(baselineSnapshot);
+
+    // Later: Modify the job lines (e.g. additional collision damage discovered)
+    const modified = await repo.update(job!.id, {
+      lines: [
+        ...transitioned.lines,
+        {
+          id: 'extra-1',
+          rowNo: 3,
+          category: 'REPLACEMENT',
+          description: 'AC Condenser Extra Genuine',
+          sellingPriceRs: 25000,
+          buyingCostRs: 18000,
+          isCompleted: false,
+        },
+      ],
+      // Even if another snapshot string is mistakenly provided:
+      originalEstimateSnapshot: JSON.stringify({ overwritten: true }),
+    });
+
+    // Verification: originalEstimateSnapshot is immutable and unchanged
+    expect(modified.originalEstimateSnapshot).toBe(baselineSnapshot);
+    expect(modified.lines.length).toBe(transitioned.lines.length + 1);
+  });
+
+  it('automatically resolves job number collisions during create()', async () => {
+    // Attempt to create a new job using an already-used job number 'JOB-2026-0042'
+    const newDto: CreateWorkshopJobSheetDto = {
+      jobNumber: 'JOB-2026-0042', // Duplicate!
+      docStage: 'QUOTATION',
+      header: {
+        date: '2026-11-02',
+        jobNumber: 'JOB-2026-0042',
+        vehicleNumber: 'WP CAC-1122',
+        natureOfRepair: 'Collision',
+        vehicleMake: 'Nissan',
+        chassisNumber: 'N16-999',
+        vehicleModel: 'Sunny',
+        daysForCompletion: '1 Day',
+        yearOfMake: '2005',
+        vehicleColor: 'Black',
+        insuranceName: 'SLIC',
+        customerInfo: 'Kasun',
+      },
+      lines: [],
+    };
+
+    const created = await repo.create(newDto);
+    // Must NOT be JOB-2026-0042 (which is already taken)
+    expect(created.jobNumber).not.toBe('JOB-2026-0042');
+    // It should have resolved to the next sequential job number (JOB-2026-0043)
+    expect(created.jobNumber).toBe(`JOB-${new Date().getFullYear()}-0043`);
+  });
 });

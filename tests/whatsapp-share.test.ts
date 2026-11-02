@@ -80,8 +80,10 @@ describe('WhatsApp Share Link Builder & Privacy Verification (Phase 4)', () => {
     expect(normalizePhoneNumber('0771234567')).toBe('94771234567');
     expect(normalizePhoneNumber('077 123 4567')).toBe('94771234567');
     expect(normalizePhoneNumber('+94 77 123 4567')).toBe('94771234567');
+    expect(normalizePhoneNumber('+94 077 123 4567')).toBe('94771234567'); // Redundant zero stripped
     expect(normalizePhoneNumber('071-555-1234')).toBe('94715551234');
     expect(normalizePhoneNumber('011 234 5678')).toBe('94112345678');
+    expect(normalizePhoneNumber('94771234567')).toBe('94771234567');
     expect(normalizePhoneNumber('')).toBe('');
     expect(normalizePhoneNumber(undefined)).toBe('');
   });
@@ -94,6 +96,14 @@ describe('WhatsApp Share Link Builder & Privacy Verification (Phase 4)', () => {
     expect(
       extractPhoneFromCustomerInfo('Sunil Silva (+94 71 234 5678), Kandy')
     ).toBe('94712345678');
+
+    expect(
+      extractPhoneFromCustomerInfo('Nimal - +94 077 123 4567 - Matara')
+    ).toBe('94771234567');
+
+    expect(
+      extractPhoneFromCustomerInfo('Kamal 94778891234 Colombo')
+    ).toBe('94778891234');
 
     expect(extractPhoneFromCustomerInfo('Walk-in Customer without phone')).toBe('');
   });

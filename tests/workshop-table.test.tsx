@@ -213,4 +213,59 @@ describe('WorkshopTable Component & Keyboard Ergonomics', () => {
     expect(screen.queryByDisplayValue('Task to delete')).not.toBeInTheDocument();
     expect(screen.getByDisplayValue('Task to keep')).toBeInTheDocument();
   });
+
+  it('advances focus to next existing row on Enter when editing an intermediate row', () => {
+    const twoRows: WorkshopLineItem[] = [
+      {
+        id: 'r1',
+        rowNo: 1,
+        category: 'LABOR_REMOVE_REASSEMBLE',
+        description: 'First',
+        sellingPriceRs: 2000,
+        buyingCostRs: 500,
+        assignedTechnician: '',
+        isCompleted: false,
+      },
+      {
+        id: 'r2',
+        rowNo: 2,
+        category: 'LABOR_REMOVE_REASSEMBLE',
+        description: 'Second',
+        sellingPriceRs: 4000,
+        buyingCostRs: 1000,
+        assignedTechnician: '',
+        isCompleted: false,
+      },
+    ];
+
+    render(<TestWorkshopTableWrapper initialItems={twoRows} isCostProfitVisible={false} />);
+
+    const amount1 = screen.getByTestId('amount-input-r1');
+    const desc2 = screen.getByTestId('desc-input-r2');
+
+    amount1.focus();
+    expect(document.activeElement).toBe(amount1);
+
+    // Press Enter in row 1 amount: should advance focus to row 2 description, NOT append a 3rd row
+    fireEvent.keyDown(amount1, { key: 'Enter', code: 'Enter' });
+    expect(document.activeElement).toBe(desc2);
+    expect(screen.getAllByPlaceholderText('Enter repair or replacement item description...').length).toBe(2);
+  });
+
+  it('renders correct colSpan for empty table state across all modes', () => {
+    // Normal mode: No (1), Desc (1), Amount (1), Action (1) = 4
+    const { rerender } = render(<TestWorkshopTableWrapper initialItems={[]} isCostProfitVisible={false} isJobCardMode={false} />);
+    let emptyCell = screen.getByText(/No line items in this section/i);
+    expect(emptyCell).toHaveAttribute('colSpan', '4');
+
+    // Cost mode: No (1), Desc (1), Amount (1), Buying Cost (1), Profit (1), Action (1) = 6
+    rerender(<TestWorkshopTableWrapper initialItems={[]} isCostProfitVisible={true} isJobCardMode={false} />);
+    emptyCell = screen.getByText(/No line items in this section/i);
+    expect(emptyCell).toHaveAttribute('colSpan', '6');
+
+    // Job Card mode: No (1), Desc (1), Tech (1), Completed (1), Action (1) = 5
+    rerender(<TestWorkshopTableWrapper initialItems={[]} isCostProfitVisible={false} isJobCardMode={true} />);
+    emptyCell = screen.getByText(/No line items in this section/i);
+    expect(emptyCell).toHaveAttribute('colSpan', '5');
+  });
 });

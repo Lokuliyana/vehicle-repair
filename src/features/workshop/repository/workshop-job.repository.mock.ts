@@ -497,7 +497,13 @@ export class MockWorkshopJobRepository implements IWorkshopJobRepository {
   async create(dto: CreateWorkshopJobSheetDto): Promise<WorkshopJobSheet> {
     this.init();
     const id = `job-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
-    const jobNumber = dto.jobNumber || (dto.header && dto.header.jobNumber) || (await this.getNextJobNumber());
+    let jobNumber = dto.jobNumber || (dto.header && dto.header.jobNumber);
+    if (
+      !jobNumber ||
+      this.jobs.some((j) => j.jobNumber.trim().toUpperCase() === jobNumber?.trim().toUpperCase())
+    ) {
+      jobNumber = await this.getNextJobNumber();
+    }
     const now = new Date().toISOString();
 
     const financials = calculateWorkshopFinancials(
@@ -578,9 +584,7 @@ export class MockWorkshopJobRepository implements IWorkshopJobRepository {
       lines: updatedLines,
       financials: recalculatedFinancials,
       originalEstimateSnapshot:
-        updates.originalEstimateSnapshot !== undefined
-          ? updates.originalEstimateSnapshot
-          : current.originalEstimateSnapshot,
+        current.originalEstimateSnapshot || updates.originalEstimateSnapshot,
       updatedAt: new Date().toISOString(),
     };
 

@@ -296,4 +296,35 @@ describe('Unified Repair Sheet Page (Phase 4)', () => {
     expect(printRoot.textContent?.toLowerCase()).not.toContain('gross profit');
     expect(printRoot.textContent?.toLowerCase()).not.toContain('margin %');
   });
+
+  it('allows adding custom unlisted items directly via the quick insertion combobox', async () => {
+    renderRepairSheetApp(['/workshop/sheet'], 'OWNER');
+
+    await waitFor(() => {
+      expect(screen.getByTestId('sheet-header-grid')).toBeInTheDocument();
+    });
+
+    const comboboxInput = screen.getByTestId('catalog-combobox-input');
+    fireEvent.focus(comboboxInput);
+    fireEvent.change(comboboxInput, { target: { value: 'Custom Specialty Weld Repair' } });
+    fireEvent.keyDown(comboboxInput, { key: 'Enter', code: 'Enter' });
+
+    // Custom item should appear in the replacement table
+    await waitFor(() => {
+      expect(screen.getByDisplayValue('Custom Specialty Weld Repair')).toBeInTheDocument();
+    });
+  });
+
+  it('DEFENSE-IN-DEPTH: WorkshopTable never renders cost or margin columns for SERVICE_ADVISOR even if cost mode was requested', async () => {
+    renderRepairSheetApp(['/workshop/sheet/job-1'], 'SERVICE_ADVISOR', true);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('sheet-header-grid')).toBeInTheDocument();
+    });
+
+    // Neither the cost panel nor any table cost input must be rendered
+    expect(screen.queryByTestId('cost-profit-panel')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('cost-input-l1')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Buying Cost \(Rs\.\)/i)).not.toBeInTheDocument();
+  });
 });

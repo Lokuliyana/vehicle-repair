@@ -8,12 +8,14 @@ import { formatRs } from './currency';
  */
 export function normalizePhoneNumber(phone?: string): string {
   if (!phone) return '';
-  const cleaned = phone.replace(/[^0-9+]/g, '');
+  let cleaned = phone.replace(/[^0-9+]/g, '');
   if (cleaned.startsWith('+')) {
-    return cleaned.substring(1);
+    cleaned = cleaned.substring(1);
   }
-  if (cleaned.startsWith('0') && cleaned.length >= 10) {
-    return '94' + cleaned.substring(1);
+  if (cleaned.startsWith('940') && cleaned.length >= 12) {
+    cleaned = '94' + cleaned.substring(3);
+  } else if (cleaned.startsWith('0') && cleaned.length >= 10) {
+    cleaned = '94' + cleaned.substring(1);
   }
   return cleaned;
 }
@@ -24,8 +26,10 @@ export function normalizePhoneNumber(phone?: string): string {
  */
 export function extractPhoneFromCustomerInfo(customerInfo?: string): string {
   if (!customerInfo) return '';
-  // Look for mobile pattern e.g. 07x xxx xxxx or +947x xxx xxxx
-  const match = customerInfo.match(/(?:\+94|0)\s*(?:7[0-9]|11|2[1-9]|3[1-9]|4[1-9]|5[1-9]|6[1-9]|8[1-9])\s*[\d\s-]{6,9}/);
+  // Look for mobile pattern e.g. 07x xxx xxxx or +947x xxx xxxx or 947x xxx xxxx
+  const match = customerInfo.match(
+    /(?:\+?94\s*0?|0)\s*(?:7[0-9]|11|2[1-9]|3[1-9]|4[1-9]|5[1-9]|6[1-9]|8[1-9])\s*[\d\s-]{6,9}/
+  );
   if (match) {
     return normalizePhoneNumber(match[0]);
   }

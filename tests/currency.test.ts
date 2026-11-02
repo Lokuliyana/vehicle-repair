@@ -125,4 +125,57 @@ describe('Currency & Profit Arithmetic (currency-math skill)', () => {
     expect(totals.grossProfitRs).toBe(4400);
     expect(totals.changeGivenRs).toBe(2200); // 20000 - 17800
   });
+
+  it('safely handles boundary cases: negative inputs and excessive discounts', () => {
+    const lines: WorkshopLineItem[] = [
+      {
+        id: '1',
+        rowNo: 1,
+        category: 'LABOR_REMOVE_REASSEMBLE',
+        description: 'Bumper Remove',
+        sellingPriceRs: -5000, // Negative input should be floored to 0
+        buyingCostRs: -1000,
+        isCompleted: true,
+      },
+      {
+        id: '2',
+        rowNo: 1,
+        category: 'REPLACEMENT',
+        description: 'Parts',
+        sellingPriceRs: 10000,
+        buyingCostRs: 6000,
+        isCompleted: true,
+      },
+    ];
+
+    // Case 1: Negative discount, negative tax, negative advance
+    const financials1 = calculateWorkshopFinancials(
+      lines,
+      -2000, // Negative discount ignored (0)
+      -500, // Negative tax ignored (0)
+      0,
+      -1000 // Negative advance ignored (0)
+    );
+
+    expect(financials1.subtotalRemoveReassembleRs).toBe(0); // floored from -5000
+    expect(financials1.subtotalReplacementRs).toBe(10000);
+    expect(financials1.discountRs).toBe(0);
+    expect(financials1.taxRs).toBe(0);
+    expect(financials1.grandTotalSalesRs).toBe(10000);
+    expect(financials1.totalBuyingCostRs).toBe(6000);
+    expect(financials1.grossProfitRs).toBe(4000);
+
+    // Case 2: Excessive discount greater than gross sales
+    const financials2 = calculateWorkshopFinancials(
+      lines,
+      15000, // Discount exceeds gross sales of 10000
+      0,
+      0,
+      0
+    );
+
+    expect(financials2.grandTotalSalesRs).toBe(0); // Net sales floored at 0
+    expect(financials2.grossProfitRs).toBe(-6000); // 0 - 6000
+    expect(financials2.grossMarginPct).toBe(0); // Cannot divide by 0
+  });
 });

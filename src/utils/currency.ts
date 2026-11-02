@@ -38,8 +38,8 @@ export function calculateWorkshopFinancials(
   let totalBuyingCostRs = 0;
 
   for (const line of lines) {
-    const selling = Number(line.sellingPriceRs) || 0;
-    const buying = Number(line.buyingCostRs) || 0;
+    const selling = Math.max(0, Number(line.sellingPriceRs) || 0);
+    const buying = Math.max(0, Number(line.buyingCostRs) || 0);
 
     totalBuyingCostRs += buying;
 
@@ -57,15 +57,15 @@ export function calculateWorkshopFinancials(
   subtotalReplacementRs = roundCurrency(subtotalReplacementRs);
   totalBuyingCostRs = roundCurrency(totalBuyingCostRs);
 
-  const roundedDiscount = roundCurrency(discountRs || 0);
-  const roundedTax = roundCurrency(taxRs || 0);
-  const roundedInsurance = roundCurrency(insuranceApprovedRs || 0);
-  const roundedAdvance = roundCurrency(advancePaidRs || 0);
+  const roundedDiscount = Math.max(0, roundCurrency(discountRs || 0));
+  const roundedTax = Math.max(0, roundCurrency(taxRs || 0));
+  const roundedInsurance = Math.max(0, roundCurrency(insuranceApprovedRs || 0));
+  const roundedAdvance = Math.max(0, roundCurrency(advancePaidRs || 0));
 
   const grossSalesRs = roundCurrency(
     subtotalRemoveReassembleRs + subtotalRepairRs + subtotalReplacementRs
   );
-  const netSalesRevenue = roundCurrency(grossSalesRs - roundedDiscount);
+  const netSalesRevenue = roundCurrency(Math.max(0, grossSalesRs - roundedDiscount));
   const grandTotalSalesRs = roundCurrency(netSalesRevenue + roundedTax);
 
   const { grossProfitRs, grossMarginPct } = calculateProfitAndMargin(

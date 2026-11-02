@@ -259,13 +259,34 @@ export function RepairSheetPage() {
     });
   };
 
+  const handleAddCustomCatalogItem = (customDesc: string) => {
+    const targetCategory: RepairLineCategory = 'REPLACEMENT';
+    const sectionItems = lines.filter((l) => l.category === targetCategory);
+    const newLine: WorkshopLineItem = {
+      id: `item-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      rowNo: sectionItems.length + 1,
+      category: targetCategory,
+      description: customDesc,
+      sellingPriceRs: 0,
+      buyingCostRs: 0,
+      assignedTechnician: '',
+      isCompleted: false,
+    };
+    setLines([...lines, newLine]);
+    toast({
+      title: 'Custom Item Added',
+      message: `Added custom line "${customDesc}". Please enter the selling price.`,
+      type: 'info',
+    });
+  };
+
   // Convert Document Stage
   const handleStageTransition = (newStage: DocumentStage) => {
     if (newStage === docStage) return;
 
-    // Snapshot locking rule for Estimate -> Job Card
+    // Snapshot locking rule for Estimate / Quotation -> Job Card
     let snapshot = originalSnapshot;
-    if (docStage === 'ESTIMATE' && newStage === 'JOB_CARD' && !originalSnapshot) {
+    if ((docStage === 'ESTIMATE' || docStage === 'QUOTATION') && newStage === 'JOB_CARD' && !originalSnapshot) {
       const currentSheetToLock: WorkshopJobSheet = {
         id: currentId || 'temp-id',
         jobNumber,
@@ -464,6 +485,7 @@ export function RepairSheetPage() {
     );
   }
 
+  const canShowCostProfit = isCostProfitVisible && permissions.canViewCosts && permissions.canViewGrossProfit;
   const isJobCardMode = docStage === 'JOB_CARD';
 
   return (
@@ -809,6 +831,7 @@ export function RepairSheetPage() {
         </div>
         <CatalogCombobox
           onSelect={handleAddCatalogPreset}
+          onSelectCustom={handleAddCustomCatalogItem}
           placeholder="Search catalog by SKU, part name, labor preset, or vehicle model..."
         />
       </div>
@@ -821,7 +844,7 @@ export function RepairSheetPage() {
           title="Labor - Remove & Reassemble"
           sectionNumber={1}
           items={lines}
-          isCostProfitVisible={isCostProfitVisible}
+          isCostProfitVisible={canShowCostProfit}
           isJobCardMode={isJobCardMode}
           onItemsChange={setLines}
         />
@@ -832,7 +855,7 @@ export function RepairSheetPage() {
           title="Labor - Repair"
           sectionNumber={2}
           items={lines}
-          isCostProfitVisible={isCostProfitVisible}
+          isCostProfitVisible={canShowCostProfit}
           isJobCardMode={isJobCardMode}
           onItemsChange={setLines}
         />
@@ -843,7 +866,7 @@ export function RepairSheetPage() {
           title="Replacement"
           sectionNumber={3}
           items={lines}
-          isCostProfitVisible={isCostProfitVisible}
+          isCostProfitVisible={canShowCostProfit}
           isJobCardMode={isJobCardMode}
           onItemsChange={setLines}
         />
@@ -1107,7 +1130,7 @@ export function RepairSheetPage() {
           </DialogHeader>
 
           {/* Render the printable component */}
-          <div className="border border-slate-300 rounded shadow-inner p-2 sm:p-4 bg-slate-100 flex justify-center">
+          <div className="border border-slate-300 rounded shadow-inner p-2 sm:p-4 bg-slate-100 flex justify-center print:border-none print:shadow-none print:p-0 print:bg-transparent">
             <A4WorkshopPrint jobSheet={activeJobSheet} />
           </div>
         </div>

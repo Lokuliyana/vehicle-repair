@@ -61,7 +61,7 @@ export function WorkshopTable({
           return { ...item, [field]: 0 };
         }
         const num = parseFloat(valStr);
-        return { ...item, [field]: isNaN(num) ? 0 : num };
+        return { ...item, [field]: isNaN(num) ? 0 : Math.max(0, num) };
       }
       return { ...item, [field]: value };
     });
@@ -187,11 +187,19 @@ export function WorkshopTable({
       } else if (col === 'amount') {
         if (isCostProfitVisible) {
           costInputRefs.current.get(item.id)?.focus();
+        } else if (idx < sectionItems.length - 1) {
+          const nextId = sectionItems[idx + 1].id;
+          descInputRefs.current.get(nextId)?.focus();
         } else {
           handleAddRow();
         }
       } else if (col === 'cost' || col === 'tech') {
-        handleAddRow();
+        if (idx < sectionItems.length - 1) {
+          const nextId = sectionItems[idx + 1].id;
+          descInputRefs.current.get(nextId)?.focus();
+        } else {
+          handleAddRow();
+        }
       }
     }
   };
@@ -273,7 +281,7 @@ export function WorkshopTable({
             {sectionItems.length === 0 ? (
               <tr>
                 <td
-                  colSpan={isJobCardMode ? 4 : isCostProfitVisible ? 5 : 3}
+                  colSpan={isJobCardMode ? 5 : isCostProfitVisible ? 6 : 4}
                   className="py-4 text-center text-xs text-slate-400 italic bg-slate-50/50"
                 >
                   No line items in this section. Press "Add Item" or click below.
