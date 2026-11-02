@@ -5,6 +5,7 @@ export interface IPosShiftRepository {
   getActiveShiftSync?(): PosShift | null;
   getAllShifts(): Promise<PosShift[]>;
   getShiftById(id: string): Promise<PosShift | null>;
+  getShiftByIdSync?(id: string): PosShift | null;
   openShiftSync?(cashierId: string, cashierName: string, openingFloatRs?: number): PosShift;
   openShift(cashierId: string, cashierName: string, openingFloatRs?: number): Promise<PosShift>;
   closeShiftSync?(shiftId: string, actualDrawerCashRs: number): PosShift;

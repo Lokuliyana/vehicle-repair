@@ -103,6 +103,11 @@ export class MockPosShiftRepository implements IPosShiftRepository {
     return shifts.find((s) => s.id === id) || null;
   }
 
+  getShiftByIdSync(id: string): PosShift | null {
+    const shifts = this.loadShifts();
+    return shifts.find((s) => s.id === id) || null;
+  }
+
   openShiftSync(
     cashierId: string,
     cashierName: string,

@@ -154,10 +154,17 @@ export function isDateInFilter(
 
     case 'CUSTOM': {
       let matches = true;
-      if (filter.startDate && itemDateStr < filter.startDate) {
+      let start = filter.startDate?.trim();
+      let end = filter.endDate?.trim();
+      if (start && end && start > end) {
+        const temp = start;
+        start = end;
+        end = temp;
+      }
+      if (start && itemDateStr < start) {
         matches = false;
       }
-      if (filter.endDate && itemDateStr > filter.endDate) {
+      if (end && itemDateStr > end) {
         matches = false;
       }
       return matches;
@@ -324,12 +331,38 @@ export class MockFinanceRepository implements IFinanceRepository {
 
   deleteExpenseSync(id: string): boolean {
     const list = this.loadExpenses();
-    const filtered = list.filter((e) => e.id !== id);
-    if (filtered.length !== list.length) {
-      this.saveExpenses(filtered);
-      return true;
+    const target = list.find((e) => e.id === id);
+    if (!target) return false;
+
+    // If linked to a POS shift, handle drawer reconciliation
+    if (target.paidFrom === 'POS_DRAWER' && target.shiftId) {
+      const activeShift = posShiftRepository.getActiveShiftSync();
+      if (activeShift && activeShift.id === target.shiftId && activeShift.status === 'OPEN') {
+        try {
+          posShiftRepository.recordCashIn(
+            activeShift.id,
+            target.amountRs,
+            `Reversal: Deleted expense voucher ${target.id} (${target.description})`,
+            target.recordedBy || 'Workshop User'
+          );
+        } catch (err) {
+          console.warn('Could not record reversal cash-in for deleted expense:', err);
+        }
+      } else {
+        const linkedShift = posShiftRepository.getShiftByIdSync
+          ? posShiftRepository.getShiftByIdSync(target.shiftId)
+          : null;
+        if (linkedShift && linkedShift.status === 'CLOSED') {
+          throw new Error(
+            `Cannot delete expense voucher ${target.id}: Linked POS shift (${target.shiftId}) is closed and finalized.`
+          );
+        }
+      }
     }
-    return false;
+
+    const filtered = list.filter((e) => e.id !== id);
+    this.saveExpenses(filtered);
+    return true;
   }
 
   async getProfitLedgerSummary(filter?: DateRangeFilter): Promise<ProfitLedgerSummary> {
@@ -360,6 +393,11 @@ export class MockFinanceRepository implements IFinanceRepository {
       workshopTotalRevenueRs += netSales;
       workshopTotalCostRs += job.financials.totalBuyingCostRs || 0;
 
+      let jobLaborSelling = 0;
+      let jobLaborCost = 0;
+      let jobPartsSelling = 0;
+      let jobPartsCost = 0;
+
       for (const line of job.lines) {
         const selling = Math.max(0, Number(line.sellingPriceRs) || 0);
         const buying = Math.max(0, Number(line.buyingCostRs) || 0);
@@ -367,13 +405,28 @@ export class MockFinanceRepository implements IFinanceRepository {
           line.category === 'LABOR_REMOVE_REASSEMBLE' ||
           line.category === 'LABOR_REPAIR'
         ) {
-          workshopLaborRevenueRs += selling;
-          workshopLaborCostRs += buying;
+          jobLaborSelling += selling;
+          jobLaborCost += buying;
         } else if (line.category === 'REPLACEMENT') {
-          workshopPartsRevenueRs += selling;
-          workshopPartsCostRs += buying;
+          jobPartsSelling += selling;
+          jobPartsCost += buying;
         }
       }
+
+      // If job has a discount, distribute it proportionally so labor + parts revenue equals netSales
+      const jobGrossSales = jobLaborSelling + jobPartsSelling;
+      const discount = job.financials.discountRs || 0;
+      if (discount > 0 && jobGrossSales > 0) {
+        const laborShare = (jobLaborSelling / jobGrossSales) * discount;
+        const partsShare = (jobPartsSelling / jobGrossSales) * discount;
+        jobLaborSelling = Math.max(0, jobLaborSelling - laborShare);
+        jobPartsSelling = Math.max(0, jobPartsSelling - partsShare);
+      }
+
+      workshopLaborRevenueRs += jobLaborSelling;
+      workshopLaborCostRs += jobLaborCost;
+      workshopPartsRevenueRs += jobPartsSelling;
+      workshopPartsCostRs += jobPartsCost;
     }
 
     workshopLaborRevenueRs = roundCurrency(workshopLaborRevenueRs);

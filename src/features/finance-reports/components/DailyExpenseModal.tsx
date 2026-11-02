@@ -60,6 +60,11 @@ export function DailyExpenseModal({
     e.preventDefault();
     setErrorMessage(null);
 
+    if (!date || !date.trim()) {
+      setErrorMessage('Please select a valid expense date.');
+      return;
+    }
+
     const parsedAmount = parseFloat(amountRs);
     if (isNaN(parsedAmount) || parsedAmount <= 0) {
       setErrorMessage('Please enter a valid expense amount greater than 0.');
@@ -270,7 +275,15 @@ export function DailyExpenseModal({
             </div>
             {paidFrom === 'POS_DRAWER' && (
               <p className="text-[11px] text-amber-800 mt-1.5 bg-amber-50 p-2 rounded border border-amber-200">
-                ⚡ <strong>Automatic Reconciliation:</strong> This will record an immediate Cash-Out entry on the active POS shift drawer.
+                {activeShift ? (
+                  <>
+                    ⚡ <strong>Automatic Reconciliation:</strong> This will record an immediate Cash-Out entry on active POS shift drawer ({activeShift.id}).
+                  </>
+                ) : (
+                  <>
+                    ℹ️ <strong>Drawer Voucher:</strong> No POS shift is currently open. Expense will be recorded as drawer petty cash.
+                  </>
+                )}
               </p>
             )}
           </div>

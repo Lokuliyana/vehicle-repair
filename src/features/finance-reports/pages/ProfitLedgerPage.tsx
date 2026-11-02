@@ -128,14 +128,22 @@ export function ProfitLedgerPage() {
 
   const handleDeleteExpense = (id: string, desc: string) => {
     if (window.confirm(`Are you sure you want to delete expense "${desc}" (${id})?`)) {
-      const deleted = financeRepository.deleteExpenseSync(id);
-      if (deleted) {
+      try {
+        const deleted = financeRepository.deleteExpenseSync(id);
+        if (deleted) {
+          toast({
+            title: 'Expense Deleted',
+            message: `Shop expense voucher ${id} has been removed.`,
+            type: 'warning',
+          });
+          setRefreshTrigger((prev) => prev + 1);
+        }
+      } catch (err) {
         toast({
-          title: 'Expense Deleted',
-          message: `Shop expense voucher ${id} has been removed.`,
-          type: 'warning',
+          title: 'Cannot Delete Expense',
+          message: err instanceof Error ? err.message : 'Failed to delete expense voucher.',
+          type: 'error',
         });
-        setRefreshTrigger((prev) => prev + 1);
       }
     }
   };
@@ -315,7 +323,7 @@ export function ProfitLedgerPage() {
           <table className="w-full text-left border-collapse text-xs" data-testid="ledger-table">
             <thead>
               <tr className="bg-slate-100 text-slate-700 font-bold text-[10px] uppercase border-b border-slate-200">
-                <th className="p-3">Date</th>
+                <th className="p-3">Date & Time</th>
                 <th className="p-3">Ref #</th>
                 <th className="p-3">Type</th>
                 <th className="p-3">Customer / Vehicle / Payee</th>
@@ -342,11 +350,36 @@ export function ProfitLedgerPage() {
                     data-testid={`ledger-row-${item.id}`}
                   >
                     <td className="p-3 text-slate-600 whitespace-nowrap font-mono text-[11px]">
-                      {item.date}
+                      <div className="font-semibold text-slate-900">{item.date}</div>
+                      <div className="text-[10px] text-slate-400">
+                        {item.timestamp ? new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                      </div>
                     </td>
 
                     <td className="p-3 font-mono font-bold text-slate-900 whitespace-nowrap">
-                      {item.reference}
+                      {item.type === 'WORKSHOP_INVOICE' && item.job ? (
+                        <button
+                          type="button"
+                          onClick={() => setActiveInvoiceJob(item.job || null)}
+                          className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer text-left font-bold"
+                          title="View / Print Workshop Invoice"
+                          data-testid={`ref-link-${item.reference}`}
+                        >
+                          {item.reference}
+                        </button>
+                      ) : item.type === 'POS_SALE' && item.posSale ? (
+                        <button
+                          type="button"
+                          onClick={() => setActiveReceiptSale(item.posSale || null)}
+                          className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer text-left font-bold"
+                          title="View / Print 80mm POS Receipt"
+                          data-testid={`ref-link-${item.reference}`}
+                        >
+                          {item.reference}
+                        </button>
+                      ) : (
+                        <span>{item.reference}</span>
+                      )}
                     </td>
 
                     <td className="p-3 whitespace-nowrap">
@@ -513,7 +546,7 @@ export function ProfitLedgerPage() {
               </div>
             </DialogHeader>
 
-            <div className="bg-slate-100 p-4 rounded-xl flex justify-center">
+            <div className="bg-slate-100 p-4 rounded-xl flex justify-center print:border-none print:shadow-none print:p-0 print:bg-transparent">
               <A4WorkshopPrint jobSheet={activeInvoiceJob} />
             </div>
           </div>

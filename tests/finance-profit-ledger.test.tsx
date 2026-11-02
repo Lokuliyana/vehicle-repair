@@ -106,6 +106,60 @@ describe('Phase 8: Embedded Finance, Sales, Cost & Gross Profit Center', () => {
         summary.workshopLaborRevenueRs + summary.workshopPartsRevenueRs
       );
     });
+
+    it('verifies Revenue Streams breakdown when workshop job has discounts applied', async () => {
+      // Add an invoiced job with discount
+      await workshopJobRepository.create({
+        docStage: 'INVOICE',
+        header: {
+          jobNumber: 'JOB-2026-DISC',
+          date: '2026-11-02',
+          vehicleNumber: 'WP CAR-1111',
+          natureOfRepair: 'General Service with Shop Discount',
+          vehicleMake: 'Toyota',
+          chassisNumber: 'NZ-10022',
+          vehicleModel: 'Vitz',
+          daysForCompletion: '1 Day',
+          yearOfMake: '2019',
+          vehicleColor: 'Silver',
+          insuranceName: 'Cash',
+          customerInfo: 'Discount Customer',
+        },
+        lines: [
+          {
+            id: 'disc-l1',
+            rowNo: 1,
+            category: 'LABOR_REPAIR',
+            description: 'Brake Servicing',
+            sellingPriceRs: 5000,
+            buyingCostRs: 1500,
+            isCompleted: true,
+          },
+          {
+            id: 'disc-l2',
+            rowNo: 2,
+            category: 'REPLACEMENT',
+            description: 'Engine Air Filter',
+            sellingPriceRs: 5000,
+            buyingCostRs: 2500,
+            isCompleted: true,
+          },
+        ],
+        discountRs: 2000,
+        taxRs: 0,
+      });
+
+      const summary = await financeRepository.getProfitLedgerSummary({ range: 'ALL_TIME' });
+
+      // Workshop total revenue must equal the sum of labor and parts streams exactly
+      expect(summary.workshopTotalRevenueRs).toBe(
+        Math.round((summary.workshopLaborRevenueRs + summary.workshopPartsRevenueRs) * 100) / 100
+      );
+      // Combined Gross Profit formula must hold true
+      expect(summary.combinedGrossProfitRs).toBe(
+        summary.totalNetSalesRs - summary.totalDirectCostRs
+      );
+    });
   });
 
   describe('2. Shop Expenses Domain & Repository CRUD', () => {
@@ -208,6 +262,57 @@ describe('Phase 8: Embedded Finance, Sales, Cost & Gross Profit Center', () => {
       const remaining = await financeRepository.getExpenses();
       expect(remaining.find((e) => e.id === target.id)).toBeUndefined();
     });
+
+    it('reverses drawer cash-out when an expense paid from POS_DRAWER is deleted while shift is OPEN', async () => {
+      const activeShift = posShiftRepository.getActiveShiftSync();
+      expect(activeShift).toBeDefined();
+      expect(activeShift?.status).toBe('OPEN');
+      const drawerBefore = activeShift!.expectedDrawerCashRs;
+
+      // 1. Create drawer expense
+      const expense = await financeRepository.createExpense({
+        date: '2026-11-02',
+        category: 'TEA_ALLOWANCE',
+        description: 'Snacks for mechanics',
+        amountRs: 1200,
+        paidFrom: 'POS_DRAWER',
+      });
+
+      const shiftAfterCreate = posShiftRepository.getActiveShiftSync();
+      expect(shiftAfterCreate?.expectedDrawerCashRs).toBe(drawerBefore - 1200);
+
+      // 2. Delete the expense
+      const deleted = await financeRepository.deleteExpense(expense.id);
+      expect(deleted).toBe(true);
+
+      // 3. Drawer cash should be restored
+      const shiftAfterDelete = posShiftRepository.getActiveShiftSync();
+      expect(shiftAfterDelete?.expectedDrawerCashRs).toBe(drawerBefore);
+    });
+
+    it('prevents deleting an expense voucher linked to a CLOSED POS shift drawer', async () => {
+      // 1. Create drawer expense
+      const expense = await financeRepository.createExpense({
+        date: '2026-11-02',
+        category: 'OTHER',
+        description: 'Temporary hardware store bolts',
+        amountRs: 800,
+        paidFrom: 'POS_DRAWER',
+      });
+
+      // 2. Close the active shift
+      const activeShift = posShiftRepository.getActiveShiftSync();
+      expect(activeShift).toBeDefined();
+      posShiftRepository.closeShiftSync(activeShift!.id, activeShift!.expectedDrawerCashRs);
+
+      const closedShift = posShiftRepository.getShiftByIdSync(activeShift!.id);
+      expect(closedShift?.status).toBe('CLOSED');
+
+      // 3. Attempting to delete this finalized expense should throw
+      await expect(financeRepository.deleteExpense(expense.id)).rejects.toThrow(
+        /Cannot delete expense voucher .* Linked POS shift .* is closed and finalized/
+      );
+    });
   });
 
   describe('3. Date Range Filtering Logic', () => {
@@ -249,6 +354,35 @@ describe('Phase 8: Embedded Finance, Sales, Cost & Gross Profit Center', () => {
           refDate
         )
       ).toBe(false);
+
+      // Inverted Custom Range (auto-normalizes)
+      expect(
+        isDateInFilter(
+          '2026-10-30',
+          { range: 'CUSTOM', startDate: '2026-11-01', endDate: '2026-10-29' },
+          refDate
+        )
+      ).toBe(true);
+    });
+
+    it('correctly handles leap years and month boundaries', () => {
+      // Leap year reference: 2024-03-01
+      const marchFirstLeap = new Date('2024-03-01T10:00:00.000Z');
+      expect(isDateInFilter('2024-02-29', { range: 'YESTERDAY' }, marchFirstLeap)).toBe(true);
+      expect(isDateInFilter('2024-02-28', { range: 'YESTERDAY' }, marchFirstLeap)).toBe(false);
+
+      // Non-leap year reference: 2025-03-01
+      const marchFirstNonLeap = new Date('2025-03-01T10:00:00.000Z');
+      expect(isDateInFilter('2025-02-28', { range: 'YESTERDAY' }, marchFirstNonLeap)).toBe(true);
+      expect(isDateInFilter('2025-02-29', { range: 'YESTERDAY' }, marchFirstNonLeap)).toBe(false);
+
+      // Week crossing month boundary: Sunday March 1, 2026 (week starts Mon Feb 23, 2026)
+      const sunMarch1 = new Date('2026-03-01T12:00:00.000Z');
+      expect(isDateInFilter('2026-02-23', { range: 'THIS_WEEK' }, sunMarch1)).toBe(true);
+      expect(isDateInFilter('2026-02-28', { range: 'THIS_WEEK' }, sunMarch1)).toBe(true);
+      expect(isDateInFilter('2026-03-01', { range: 'THIS_WEEK' }, sunMarch1)).toBe(true);
+      expect(isDateInFilter('2026-02-22', { range: 'THIS_WEEK' }, sunMarch1)).toBe(false);
+      expect(isDateInFilter('2026-03-02', { range: 'THIS_WEEK' }, sunMarch1)).toBe(false);
     });
   });
 
@@ -467,6 +601,68 @@ describe('Phase 8: Embedded Finance, Sales, Cost & Gross Profit Center', () => {
       expect(
         screen.getByText(/Workshop Invoice Print Preview — JOB-2026-0040/i)
       ).toBeInTheDocument();
+    });
+
+    it('renders Date & Time column header and supports 1-click modal preview directly from Ref # link', async () => {
+      render(
+        <TestWrapper initialRole="OWNER">
+          <ProfitLedgerPage />
+        </TestWrapper>
+      );
+
+      // Verify column header
+      expect(screen.getByRole('columnheader', { name: /date & time/i })).toBeInTheDocument();
+
+      // Click Ref # for Workshop Invoice
+      const refLinkJob = screen.getByTestId('ref-link-JOB-2026-0040');
+      act(() => {
+        fireEvent.click(refLinkJob);
+      });
+      expect(screen.getByText(/Workshop Invoice Print Preview — JOB-2026-0040/i)).toBeInTheDocument();
+
+      // Close dialog
+      const closeBtn = screen.getByRole('button', { name: /close/i });
+      act(() => {
+        fireEvent.click(closeBtn);
+      });
+
+      // Click Ref # for POS Sale
+      const refLinkPos = screen.getByTestId('ref-link-POS-2026-0001');
+      act(() => {
+        fireEvent.click(refLinkPos);
+      });
+      expect(screen.getByText(/80mm Thermal Receipt \(POS-2026-0001\)/i)).toBeInTheDocument();
+    });
+
+    it('rejects expense entry when date field is empty', async () => {
+      render(
+        <TestWrapper initialRole="OWNER">
+          <ProfitLedgerPage />
+        </TestWrapper>
+      );
+
+      const openBtn = screen.getByTestId('record-expense-btn');
+      act(() => {
+        fireEvent.click(openBtn);
+      });
+
+      const dateInput = screen.getByTestId('expense-date-input');
+      const descInput = screen.getByTestId('expense-desc-input');
+      const amountInput = screen.getByTestId('expense-amount-input');
+      const submitBtn = screen.getByTestId('expense-submit-btn');
+
+      act(() => {
+        fireEvent.change(dateInput, { target: { value: '' } });
+        fireEvent.change(descInput, { target: { value: 'Test description' } });
+        fireEvent.change(amountInput, { target: { value: '500' } });
+      });
+
+      await act(async () => {
+        fireEvent.click(submitBtn);
+      });
+
+      expect(screen.getByTestId('expense-error-alert')).toBeInTheDocument();
+      expect(screen.getByText('Please select a valid expense date.')).toBeInTheDocument();
     });
   });
 });
