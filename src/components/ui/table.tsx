@@ -17,9 +17,17 @@ Table.displayName = 'Table';
 
 export const TableHeader = React.forwardRef<
   HTMLTableSectionElement,
-  React.HTMLAttributes<HTMLTableSectionElement>
->(({ className, ...props }, ref) => (
-  <thead ref={ref} className={cn('[&_tr]:border-b bg-slate-100', className)} {...props} />
+  React.HTMLAttributes<HTMLTableSectionElement> & { variant?: 'warm' | 'slate' }
+>(({ className, variant = 'warm', ...props }, ref) => (
+  <thead
+    ref={ref}
+    className={cn(
+      '[&_tr]:border-b',
+      variant === 'warm' ? 'bg-[#FFF7ED]/70' : 'bg-slate-50/80',
+      className
+    )}
+    {...props}
+  />
 ));
 TableHeader.displayName = 'TableHeader';
 
@@ -42,7 +50,7 @@ export const TableFooter = React.forwardRef<
   <tfoot
     ref={ref}
     className={cn(
-      'border-t bg-slate-100/50 font-medium [&>tr]:last:border-b-0',
+      'border-t bg-slate-50/80 font-medium [&>tr]:last:border-b-0',
       className
     )}
     {...props}
@@ -57,7 +65,7 @@ export const TableRow = React.forwardRef<
   <tr
     ref={ref}
     className={cn(
-      'border-b border-slate-200 transition-colors hover:bg-slate-50/50 data-[state=selected]:bg-slate-100',
+      'border-b border-slate-200/80 transition-colors hover:bg-slate-50/70 data-[state=selected]:bg-slate-100',
       className
     )}
     {...props}
@@ -72,7 +80,7 @@ export const TableHead = React.forwardRef<
   <th
     ref={ref}
     className={cn(
-      'h-9 px-3 text-left align-middle font-semibold text-slate-700 [&:has([role=checkbox])]:pr-0',
+      'h-9 px-3 text-left align-middle text-[11px] font-semibold uppercase tracking-wider text-slate-700 [&:has([role=checkbox])]:pr-0',
       className
     )}
     {...props}
@@ -91,3 +99,4 @@ export const TableCell = React.forwardRef<
   />
 ));
 TableCell.displayName = 'TableCell';
+

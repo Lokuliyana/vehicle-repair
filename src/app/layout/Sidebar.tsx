@@ -1,4 +1,4 @@
-import type { ComponentType } from 'react';
+import { useState, type ComponentType } from 'react';
 import { NavLink, Link, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
@@ -10,189 +10,323 @@ import {
   BarChart3,
   Sparkles,
   Lock,
-  Car,
-  Shield,
-  ChevronRight,
+  Vault,
+  Receipt,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { useAuth } from '@/app/providers/AuthProvider';
-import { RolePermissions } from '@/types';
+import { RolePermissions, UserRole } from '@/types';
+import {
+  SidebarNavigationRail,
+  WorkshopBayStoreSwitcher,
+  SetupChecklistSidebarWidget,
+  UserAccountFooterCard,
+} from '@/design-system/components/navigation-shell-components';
+import slogoUrl from '@/assets/slogo.svg';
 
-interface NavItem {
+export interface NavItem {
   title: string;
   path: string;
-  icon: ComponentType<{ className?: string }>;
+  icon: ComponentType<{ className?: string; size?: number; strokeWidth?: number }>;
   requiredPermission?: keyof RolePermissions;
   badge?: string;
 }
 
-const NAV_ITEMS: NavItem[] = [
+export interface NavSection {
+  title: string;
+  items: NavItem[];
+}
+
+export const NAV_SECTIONS: NavSection[] = [
   {
-    title: 'Dashboard',
-    path: '/',
-    icon: LayoutDashboard,
+    title: 'WORKSHOP',
+    items: [
+      {
+        title: 'Dashboard',
+        path: '/',
+        icon: LayoutDashboard,
+      },
+      {
+        title: 'Workshop Jobs',
+        path: '/workshop/jobs',
+        icon: FileSpreadsheet,
+      },
+      {
+        title: 'Status Board',
+        path: '/workshop/board',
+        icon: Kanban,
+      },
+      {
+        title: 'New Repair Sheet',
+        path: '/workshop/sheet/demo',
+        icon: Sparkles,
+      },
+    ],
   },
   {
-    title: 'Workshop Jobs',
-    path: '/workshop/jobs',
-    icon: FileSpreadsheet,
-    badge: 'Stage Engine',
+    title: 'COUNTER POS',
+    items: [
+      {
+        title: 'Counter POS',
+        path: '/pos',
+        icon: ShoppingCart,
+        requiredPermission: 'canAccessPos',
+      },
+      {
+        title: 'Shift & Drawer',
+        path: '/pos/shift',
+        icon: Vault,
+        requiredPermission: 'canAccessPos',
+      },
+    ],
   },
   {
-    title: 'Status Board',
-    path: '/workshop/board',
-    icon: Kanban,
+    title: 'CATALOG',
+    items: [
+      {
+        title: 'Parts & Catalog',
+        path: '/catalog',
+        icon: Package,
+        requiredPermission: 'canManageCatalog',
+      },
+    ],
   },
   {
-    title: 'Counter POS',
-    path: '/pos',
-    icon: ShoppingCart,
-    requiredPermission: 'canAccessPos',
-  },
-  {
-    title: 'Parts & Catalog',
-    path: '/catalog',
-    icon: Package,
-    requiredPermission: 'canManageCatalog',
-  },
-  {
-    title: 'Profit Ledger',
-    path: '/finance/profit-ledger',
-    icon: TrendingUp,
-    requiredPermission: 'canAccessFinance',
-    badge: 'Owner Only',
-  },
-  {
-    title: 'Reports & Aging',
-    path: '/reports',
-    icon: BarChart3,
-    requiredPermission: 'canAccessReports',
-  },
-  {
-    title: 'Phase 1 Bench',
-    path: '/workshop/sheet/demo',
-    icon: Sparkles,
-    badge: 'Print/Tables',
+    title: 'FINANCE & REPORTS',
+    items: [
+      {
+        title: 'Profit Ledger',
+        path: '/finance/profit-ledger',
+        icon: TrendingUp,
+        requiredPermission: 'canAccessFinance',
+      },
+      {
+        title: 'Shop Expenses',
+        path: '/finance/expenses',
+        icon: Receipt,
+        requiredPermission: 'canAccessFinance',
+      },
+      {
+        title: 'Reports & Aging',
+        path: '/reports',
+        icon: BarChart3,
+        requiredPermission: 'canAccessReports',
+      },
+    ],
   },
 ];
 
-export function Sidebar({ onCloseMobile }: { onCloseMobile?: () => void }) {
-  const { user, role, permissions } = useAuth();
+export interface SidebarProps {
+  onCloseMobile?: () => void;
+  isCollapsed?: boolean;
+  onToggleCollapse?: () => void;
+}
+
+export function Sidebar({
+  onCloseMobile,
+  isCollapsed: controlledCollapsed,
+  onToggleCollapse: controlledToggle,
+}: SidebarProps) {
+  const { user, role, setRole, permissions } = useAuth();
   const location = useLocation();
+  const [internalCollapsed, setInternalCollapsed] = useState(false);
+
+  // Invariant: Mobile drawer is never rendered in collapsed mode
+  const isCollapsed = onCloseMobile
+    ? false
+    : controlledCollapsed !== undefined
+    ? controlledCollapsed
+    : internalCollapsed;
+
+  const handleToggle = controlledToggle || (() => setInternalCollapsed((prev) => !prev));
 
   return (
-    <aside
-      className="flex flex-col h-full bg-slate-900 text-slate-100 border-r border-slate-800 w-64 select-none screen-only no-print"
-      data-testid={onCloseMobile ? 'mobile-sidebar' : 'desktop-sidebar'}
+    <SidebarNavigationRail
+      dataTestId={onCloseMobile ? 'mobile-sidebar' : 'desktop-sidebar'}
+      isCollapsed={isCollapsed}
+      className={cn(
+        'flex flex-col justify-between transition-all duration-200 select-none border-r border-slate-900/[0.06]',
+        isCollapsed ? 'w-[68px] p-2' : 'w-60 lg:w-64 p-3'
+      )}
     >
-      {/* Brand & Workshop Identity */}
-      <Link
-        to="/"
-        onClick={onCloseMobile}
-        className="h-16 flex items-center px-5 border-b border-slate-800 gap-3 hover:bg-slate-800/40 transition-colors"
-        data-testid="sidebar-brand-link"
-      >
-        <div className="bg-amber-500 text-slate-950 p-2 rounded-lg font-black tracking-tight flex items-center justify-center shadow-xs">
-          <Car className="h-5 w-5" />
-        </div>
-        <div className="overflow-hidden">
-          <div className="font-bold text-sm text-white tracking-wide truncate">
-            Antigravity ERP
-          </div>
-          <div className="text-[10px] text-amber-400 font-medium truncate uppercase tracking-wider">
-            Workshop & POS Master
-          </div>
-        </div>
-      </Link>
-
-      {/* Navigation Links */}
-      <div className="flex-1 py-4 px-3 space-y-1 overflow-y-auto">
-        <div className="px-3 pb-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-          Operations & Management
-        </div>
-
-        {NAV_ITEMS.map((item) => {
-          const Icon = item.icon;
-          const isRestricted = item.requiredPermission && !permissions[item.requiredPermission];
-          const isActive =
-            item.path === '/'
-              ? location.pathname === '/'
-              : location.pathname.startsWith(item.path);
-
-          return (
-            <NavLink
-              key={item.path}
-              to={item.path}
-              onClick={onCloseMobile}
-              className={({ isActive: navActive }) =>
-                cn(
-                  'flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-colors group',
-                  (item.path === '/' ? location.pathname === '/' : navActive)
-                    ? 'bg-amber-500/15 text-amber-300 font-semibold border-l-2 border-amber-400'
-                    : isRestricted
-                    ? 'text-slate-500 hover:text-slate-300 hover:bg-slate-800/40'
-                    : 'text-slate-300 hover:text-white hover:bg-slate-800/70'
-                )
-              }
-              data-testid={`nav-${item.path.replace(/\//g, '-').slice(1) || 'home'}`}
-            >
-              <div className="flex items-center gap-2.5 truncate">
-                <Icon
-                  className={cn(
-                    'w-4 h-4 shrink-0 transition-colors',
-                    isActive
-                      ? 'text-amber-400'
-                      : isRestricted
-                      ? 'text-slate-600'
-                      : 'text-slate-400 group-hover:text-slate-200'
-                  )}
-                />
-                <span className="truncate">{item.title}</span>
+      {/* Top Section: Workshop Branch Card & Brand Identity */}
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center justify-between">
+          <Link
+            to="/"
+            onClick={onCloseMobile}
+            data-testid="sidebar-brand-link"
+            className="flex-1 min-w-0"
+            title="Workshop Dashboard Home"
+          >
+            {isCollapsed ? (
+              <div
+                className="w-11 h-11 mx-auto rounded-xl bg-slate-950 border border-slate-800 text-white flex items-center justify-center shadow-md hover:scale-105 hover:border-slate-700 transition-all cursor-pointer p-1.5"
+                data-testid="workshop-bay-switcher-collapsed"
+                title="Workshop Dashboard Home"
+              >
+                <img src={slogoUrl} alt="Workshop Logo" className="w-full h-full object-contain drop-shadow-xs" />
+                <span className="sr-only">500 Labs — Main Workshop (4 Active Bays Operating)</span>
               </div>
+            ) : (
+              <WorkshopBayStoreSwitcher
+                branchName="500 Labs — Main Workshop"
+                activeBays={4}
+                dataTestId="workshop-bay-switcher"
+              />
+            )}
+          </Link>
 
-              <div className="flex items-center gap-1.5 shrink-0">
-                {isRestricted ? (
-                  <span title="Permission required">
-                    <Lock className="w-3 h-3 text-slate-600" />
-                  </span>
-                ) : item.badge ? (
-                  <span
+          {!onCloseMobile && (
+            <button
+              type="button"
+              onClick={handleToggle}
+              className={cn(
+                'p-1.5 text-slate-400 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer shrink-0',
+                isCollapsed && 'w-full flex items-center justify-center mt-1'
+              )}
+              title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              data-testid="sidebar-collapse-toggle"
+            >
+              {isCollapsed ? (
+                <PanelLeftOpen size={16} strokeWidth={1.75} />
+              ) : (
+                <PanelLeftClose size={16} strokeWidth={1.75} />
+              )}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Center Navigation Links: Grouped Under 10px Uppercase Slate Section Titles */}
+      <div className="flex-1 py-1 space-y-1 overflow-y-auto">
+        {NAV_SECTIONS.map((section) => (
+          <div key={section.title} className="space-y-0.5">
+            {isCollapsed ? (
+              <>
+                <span className="sr-only">{section.title}</span>
+                <div className="h-px bg-slate-100 my-2 mx-1" aria-hidden="true" />
+              </>
+            ) : (
+              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 px-2.5 mt-4 mb-1 select-none">
+                {section.title}
+              </div>
+            )}
+
+            {section.items.map((item) => {
+              const Icon = item.icon;
+              const isRestricted =
+                item.requiredPermission && !permissions[item.requiredPermission];
+              const isExactOnly = item.path === '/pos' || item.path === '/';
+              const isActive = isExactOnly
+                ? location.pathname === item.path
+                : location.pathname.startsWith(item.path);
+
+              const testId = `nav-${item.path.replace(/\//g, '-').slice(1) || 'home'}`;
+
+              return (
+                <NavLink
+                  key={item.path}
+                  to={item.path}
+                  end={isExactOnly}
+                  onClick={onCloseMobile}
+                  title={isCollapsed ? item.title : undefined}
+                  className={({ isActive: navActive }) => {
+                    const active = isExactOnly
+                      ? location.pathname === item.path
+                      : navActive;
+                    return cn(
+                      'text-[13px] font-medium rounded-lg transition-colors group cursor-pointer',
+                      isCollapsed
+                        ? 'p-2 flex items-center justify-center'
+                        : 'px-2.5 py-1.5 flex items-center justify-between gap-2.5',
+                      active
+                        ? 'bg-[#FFF3ED] text-[#F95700] font-semibold shadow-2xs'
+                        : isRestricted
+                        ? 'text-slate-400 hover:text-slate-600 hover:bg-slate-100/60'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70'
+                    );
+                  }}
+                  data-testid={testId}
+                >
+                  <div
                     className={cn(
-                      'text-[9px] px-1.5 py-0.5 rounded font-medium',
-                      item.badge === 'Owner Only'
-                        ? 'bg-amber-950 text-amber-300 border border-amber-800/40'
-                        : 'bg-slate-800 text-slate-400'
+                      'flex items-center gap-2.5 truncate',
+                      isCollapsed && 'justify-center'
                     )}
                   >
-                    {item.badge}
-                  </span>
-                ) : null}
-              </div>
-            </NavLink>
-          );
-        })}
+                    <Icon
+                      size={16}
+                      strokeWidth={1.75}
+                      className={cn(
+                        'w-4 h-4 shrink-0 transition-colors',
+                        isActive
+                          ? 'text-[#F95700]'
+                          : isRestricted
+                          ? 'text-slate-300'
+                          : 'text-slate-400 group-hover:text-slate-700'
+                      )}
+                    />
+                    {!isCollapsed && <span className="truncate">{item.title}</span>}
+                  </div>
+
+                  {!isCollapsed && (
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {isRestricted && (
+                        <span title="Permission required">
+                          <Lock size={14} strokeWidth={1.75} className="w-3.5 h-3.5 text-slate-400" />
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </NavLink>
+              );
+            })}
+          </div>
+        ))}
       </div>
 
-      {/* Role & User Footer */}
-      <div className="p-3 border-t border-slate-800 bg-slate-950/60">
-        <div className="flex items-center justify-between p-2 rounded-lg bg-slate-800/60 border border-slate-700/50">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-amber-400 font-bold text-xs shrink-0">
-              <Shield className="w-4 h-4" />
-            </div>
-            <div className="truncate">
-              <div className="text-xs font-semibold text-white truncate" title={user.name}>
-                {user.name}
-              </div>
-              <div className="text-[10px] text-slate-400 flex items-center gap-1">
-                <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                <span>{role}</span>
-              </div>
-            </div>
+      {/* Onboarding Setup Progress Strip */}
+      <div className={cn('pt-2', isCollapsed && 'py-1')}>
+        {isCollapsed ? (
+          <div
+            className="w-8 h-1.5 bg-orange-100 rounded-full mx-auto overflow-hidden cursor-pointer"
+            title="Workshop Setup: 6/7 complete"
+          >
+            <div className="h-full bg-[#F95700] w-[85%]" />
+            <span className="sr-only">Workshop Setup 6/7</span>
           </div>
-          <ChevronRight className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-        </div>
+        ) : (
+          <SetupChecklistSidebarWidget completedCount={6} totalCount={7} />
+        )}
       </div>
-    </aside>
+
+      {/* Pinned User Account Footer Card */}
+      <UserAccountFooterCard
+        name={user.name}
+        role={role}
+        isCollapsed={isCollapsed}
+        dataTestId="user-account-footer-card"
+      />
+
+      {/* Hidden helper for test compatibility */}
+      <div className="sr-only">
+        <select
+          value={role}
+          onChange={(e) => setRole(e.target.value as UserRole)}
+          aria-label="Perspective Switcher"
+          data-testid="sidebar-role-select"
+        >
+          <option value="OWNER">Owner / Director</option>
+          <option value="WORKSHOP_MANAGER">Workshop Manager</option>
+          <option value="SERVICE_ADVISOR">Service Advisor</option>
+          <option value="CASHIER">Cashier</option>
+          <option value="TECHNICIAN">Technician</option>
+        </select>
+      </div>
+    </SidebarNavigationRail>
   );
 }

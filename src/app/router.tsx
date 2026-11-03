@@ -5,9 +5,12 @@ import { WorkshopJobsPage } from '@/features/workshop/pages/WorkshopJobsPage';
 import { WorkshopBoardPage } from '@/features/workshop/pages/WorkshopBoardPage';
 import { RepairSheetPage } from '@/features/workshop/pages/RepairSheetPage';
 import { InteractiveBenchPage } from '@/features/workshop/pages/InteractiveBenchPage';
+import { WorkshopInvoicePage } from '@/features/workshop/pages/WorkshopInvoicePage';
 import { PosTerminalPage } from '@/features/pos/pages/PosTerminalPage';
+import { PosShiftManagementPage } from '@/features/pos/pages/PosShiftManagementPage';
 import { CatalogListPage } from '@/features/catalog/pages/CatalogListPage';
 import { ProfitLedgerPage } from '@/features/finance-reports/pages/ProfitLedgerPage';
+import { ExpensesPage } from '@/features/finance-reports/pages/ExpensesPage';
 import { ReportsPage } from '@/features/finance-reports/pages/ReportsPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
@@ -19,6 +22,10 @@ export const router = createBrowserRouter([
     children: [
       {
         index: true,
+        element: <RoleDashboardPage />,
+      },
+      {
+        path: 'dashboard',
         element: <RoleDashboardPage />,
       },
       {
@@ -34,6 +41,10 @@ export const router = createBrowserRouter([
         element: <RepairSheetPage />,
       },
       {
+        path: 'workshop/new',
+        element: <RepairSheetPage />,
+      },
+      {
         path: 'workshop/sheet/:id',
         element: <RepairSheetPage />,
       },
@@ -42,10 +53,22 @@ export const router = createBrowserRouter([
         element: <InteractiveBenchPage />,
       },
       {
+        path: 'workshop/invoice/:id',
+        element: <WorkshopInvoicePage />,
+      },
+      {
         path: 'pos',
         element: (
           <ProtectedRoute requiredPermission="canAccessPos">
             <PosTerminalPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'pos/shift',
+        element: (
+          <ProtectedRoute requiredPermission="canAccessPos">
+            <PosShiftManagementPage />
           </ProtectedRoute>
         ),
       },
@@ -62,6 +85,14 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute requiredPermission="canAccessFinance">
             <ProfitLedgerPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: 'finance/expenses',
+        element: (
+          <ProtectedRoute requiredPermission="canAccessFinance">
+            <ExpensesPage />
           </ProtectedRoute>
         ),
       },

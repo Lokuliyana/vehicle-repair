@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Car, CheckCircle2, X, Sparkles } from 'lucide-react';
+import { History, CheckCircle2, X } from 'lucide-react';
 import { VehicleHistoricalRecord } from '../types';
 import { useVehicleLookup } from '../hooks/useVehicleLookup';
 import { normalizePlate } from '../repository/vehicle-history.repository.mock';
@@ -77,7 +77,7 @@ export function VehicleLookupInput({
   };
 
   return (
-    <div ref={containerRef} className={cn('relative space-y-1.5', className)}>
+    <div ref={containerRef} className="relative space-y-1.5 w-full">
       {label && (
         <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
           {label}
@@ -90,7 +90,8 @@ export function VehicleLookupInput({
           onChange={handleInputChange}
           placeholder={placeholder}
           className={cn(
-            'font-mono uppercase font-bold tracking-wider text-slate-900 pr-8',
+            'font-mono uppercase font-bold tracking-wider text-slate-900 pr-8 h-8 text-xs bg-white border border-slate-200 rounded-lg',
+            className,
             error && 'border-rose-500 focus-visible:ring-rose-400'
           )}
           data-testid="vehicle-lookup-input"
@@ -108,50 +109,25 @@ export function VehicleLookupInput({
 
       {error && <p className="text-[11px] text-rose-600 font-medium">{error}</p>}
 
-      {/* Non-blocking suggestion pill */}
+      {/* Non-colliding, solid, non-transparent auto-fill bar */}
       {hasSuggestions && topMatch && !isCurrentlyPopulated && (
         <div
           data-testid="vehicle-suggestion-pill"
-          className="mt-1.5 rounded-lg border border-amber-200 bg-amber-50/90 p-2.5 text-xs text-amber-950 shadow-xs animate-in fade-in-50 slide-in-from-top-1"
+          className="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-2.5 text-xs text-amber-950 shadow-sm relative z-20"
         >
-          <div className="flex items-start justify-between gap-2">
-            <div className="flex items-start gap-2">
-              <div className="mt-0.5 rounded-md bg-amber-200/80 p-1 text-amber-900">
-                <Car className="h-3.5 w-3.5" />
-              </div>
-              <div className="space-y-0.5 leading-snug">
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className="font-bold text-amber-950 font-mono">
-                    {topMatch.vehicleNumber}
-                  </span>
-                  <span className="text-[11px] text-amber-800">
-                    ({topMatch.vehicleMake} {topMatch.vehicleModel} · {topMatch.yearOfMake})
-                  </span>
-                </div>
-                <div className="text-[11px] text-amber-900 truncate max-w-sm">
-                  Customer: <span className="font-semibold">{topMatch.customerInfo}</span>
-                </div>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <History className="h-3.5 w-3.5 text-amber-600 shrink-0" />
+              <div className="text-xs text-amber-950 truncate">
+                Previous record found for{' '}
+                <span className="font-bold font-mono">{topMatch.vehicleNumber}</span>{' '}
+                <span className="text-amber-800">
+                  ({topMatch.vehicleMake} {topMatch.vehicleModel} · {topMatch.customerInfo || topMatch.customerName})
+                </span>
               </div>
             </div>
 
-            <button
-              type="button"
-              onClick={dismissSuggestions}
-              aria-label="Dismiss suggestion"
-              className="text-amber-700 hover:text-amber-950 p-0.5 rounded-md hover:bg-amber-200/50 cursor-pointer"
-              data-testid="vehicle-suggestion-dismiss"
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
-          </div>
-
-          <div className="mt-2 flex items-center justify-between gap-2 pt-1 border-t border-amber-200/60">
-            <div className="flex items-center gap-1 text-[10px] text-amber-700 font-medium">
-              <Sparkles className="h-3 w-3 text-amber-600" />
-              <span>Found previous repair job in records</span>
-            </div>
-
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 shrink-0 ml-auto">
               {suggestions.length > 1 && (
                 <button
                   type="button"
@@ -165,12 +141,21 @@ export function VehicleLookupInput({
                 type="button"
                 size="sm"
                 onClick={() => handlePopulate(topMatch)}
-                className="h-6 text-[11px] px-2.5 bg-amber-600 hover:bg-amber-700 text-white font-semibold gap-1 shadow-xs"
+                className="h-6 text-[11px] px-2.5 bg-amber-600 hover:bg-amber-700 text-white font-semibold gap-1 shadow-2xs"
                 data-testid="vehicle-populate-btn"
               >
                 <CheckCircle2 className="h-3 w-3" />
-                Populate Details
+                Auto-Fill Vehicle Details
               </Button>
+              <button
+                type="button"
+                onClick={dismissSuggestions}
+                aria-label="Dismiss suggestion"
+                className="text-amber-700 hover:text-amber-950 p-1 rounded-md hover:bg-amber-200/50 cursor-pointer"
+                data-testid="vehicle-suggestion-dismiss"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
             </div>
           </div>
 
@@ -180,7 +165,7 @@ export function VehicleLookupInput({
               {suggestions.slice(1).map((sugg) => (
                 <div
                   key={sugg.vehicleNumber}
-                  className="flex items-center justify-between p-1.5 rounded-md bg-white/70 hover:bg-white text-[11px] transition-colors"
+                  className="flex items-center justify-between p-1.5 rounded-md bg-white hover:bg-amber-100/40 text-[11px] transition-colors"
                 >
                   <div>
                     <span className="font-bold font-mono text-slate-800 mr-2">

@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   Package,
   AlertTriangle,
@@ -13,6 +13,10 @@ import { InventoryVelocityAndAlertsReportData, StockAlertSeverity, DateRangeOpti
 import { formatRs } from '@/utils/currency';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import {
+  PopularPartsRankedListCard,
+  LowStockAlertTickerCard,
+} from '@/design-system';
 
 interface FastMovingPartsAlertsTabProps {
   data: InventoryVelocityAndAlertsReportData;
@@ -20,6 +24,7 @@ interface FastMovingPartsAlertsTabProps {
 }
 
 export function FastMovingPartsAlertsTab({ data, activeRange = 'THIS_MONTH' }: FastMovingPartsAlertsTabProps) {
+  const navigate = useNavigate();
   const [partsSearch, setPartsSearch] = useState('');
   const [alertsSearch, setAlertsSearch] = useState('');
   const [alertSeverityFilter, setAlertSeverityFilter] = useState<'ALL' | StockAlertSeverity>('ALL');
@@ -54,6 +59,34 @@ export function FastMovingPartsAlertsTab({ data, activeRange = 'THIS_MONTH' }: F
 
   const topConsumedItem = data.fastMovingParts[0];
 
+  // Map to PopularPartsRankedListCard format
+  const rankedCardItems = useMemo(() => {
+    return data.fastMovingParts.slice(0, 5).map((p) => ({
+      sku: p.sku,
+      name: p.name,
+      soldCount: p.totalQtyConsumed,
+      totalQtyConsumed: p.totalQtyConsumed,
+      revenueRs: p.totalRevenueRs,
+      turnoverRate: p.turnoverRate || `${p.totalQtyConsumed} units`,
+      category: p.category,
+    }));
+  }, [data.fastMovingParts]);
+
+  // Map to LowStockAlertTickerCard format
+  const tickerAlerts = useMemo(() => {
+    return data.lowStockAlerts.map((a) => ({
+      name: a.name,
+      sku: a.sku,
+      stockQty: a.stockQty,
+      minQty: a.lowStockAlertLevel,
+      lowStockAlertLevel: a.lowStockAlertLevel,
+      deficitQty: a.deficitQty,
+      turnoverRate: a.turnoverRate || 'High',
+      reorderNotes: a.reorderNotes,
+      status: a.status,
+    }));
+  }, [data.lowStockAlerts]);
+
   return (
     <div className="space-y-6" data-testid="fast-moving-parts-alerts-tab">
       {/* High-Level Inventory Metrics */}
@@ -74,57 +107,49 @@ export function FastMovingPartsAlertsTab({ data, activeRange = 'THIS_MONTH' }: F
           <div className="text-lg font-black text-slate-900 tracking-tight truncate" title={topConsumedItem?.name}>
             {topConsumedItem ? topConsumedItem.name : 'No Items'}
           </div>
-          <div className="text-[11px] text-slate-500 font-mono">
+          <div className="text-[11px] text-slate-500 font-sans tabular-nums">
             {topConsumedItem ? `${topConsumedItem.totalQtyConsumed} ${topConsumedItem.uom} sold/used` : '0 sold'}
           </div>
         </div>
 
         {/* Out of Stock Alert */}
         <div
-          className={`p-5 rounded-xl border shadow-xs space-y-2 ${
-            data.totalOutOfStockItemsCount > 0
-              ? 'bg-rose-50/60 border-rose-300'
-              : 'bg-white border-slate-200'
-          }`}
+          className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-2"
           data-testid="kpi-out-of-stock"
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-rose-800 uppercase tracking-wider">
+            <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
               Critical Out of Stock
             </span>
-            <div className="p-2 bg-rose-100 text-rose-700 rounded-lg">
+            <div className="p-2 bg-rose-50 text-rose-600 rounded-lg">
               <AlertTriangle className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-2xl font-black text-rose-950 font-mono tracking-tight">
+          <div className="text-2xl font-black text-slate-900 font-sans tabular-nums tracking-tight">
             {data.totalOutOfStockItemsCount} Items
           </div>
-          <div className="text-[11px] text-rose-800 font-medium">
+          <div className="text-[11px] text-slate-500 font-medium">
             Immediate reorder required (Stock = 0)
           </div>
         </div>
 
         {/* Low Stock Warning */}
         <div
-          className={`p-5 rounded-xl border shadow-xs space-y-2 ${
-            data.totalLowStockItemsCount > 0
-              ? 'bg-amber-50/60 border-amber-300'
-              : 'bg-white border-slate-200'
-          }`}
+          className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-2"
           data-testid="kpi-low-stock"
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-amber-800 uppercase tracking-wider">
+            <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
               Low Stock Warnings
             </span>
-            <div className="p-2 bg-amber-100 text-amber-700 rounded-lg">
+            <div className="p-2 bg-amber-50 text-amber-600 rounded-lg">
               <Boxes className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-2xl font-black text-amber-950 font-mono tracking-tight">
+          <div className="text-2xl font-black text-slate-900 font-sans tabular-nums tracking-tight">
             {data.totalLowStockItemsCount} Items
           </div>
-          <div className="text-[11px] text-amber-800 font-medium">
+          <div className="text-[11px] text-slate-500 font-medium">
             Stock at or below reorder threshold
           </div>
         </div>
@@ -142,13 +167,26 @@ export function FastMovingPartsAlertsTab({ data, activeRange = 'THIS_MONTH' }: F
               <Package className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-2xl font-black text-slate-900 font-mono tracking-tight">
+          <div className="text-2xl font-black text-slate-900 font-sans tabular-nums tracking-tight">
             {data.totalInventoryDeficitQty} Units
           </div>
           <div className="text-[11px] text-slate-500">
             Units needed to restore safety stock
           </div>
         </div>
+      </div>
+
+      {/* Visual Intelligence Cards: PopularPartsRankedListCard & LowStockAlertTickerCard */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <PopularPartsRankedListCard
+          title="Fast-Moving Parts & Lubricants"
+          items={rankedCardItems}
+        />
+
+        <LowStockAlertTickerCard
+          alerts={tickerAlerts}
+          onQuickRestock={(sku) => navigate(`/catalog?search=${encodeURIComponent(sku)}`)}
+        />
       </div>
 
       {/* Section 1: Fast-Moving Parts & Lubricants Velocity */}
@@ -195,6 +233,7 @@ export function FastMovingPartsAlertsTab({ data, activeRange = 'THIS_MONTH' }: F
                 <th className="py-3 px-4 text-center">Workshop Qty</th>
                 <th className="py-3 px-4 text-center">POS Sold Qty</th>
                 <th className="py-3 px-4 text-center">Total Consumed</th>
+                <th className="py-3 px-4 text-center">Turnover Rate</th>
                 <th className="py-3 px-4 text-right">Revenue (Rs.)</th>
                 <th className="py-3 px-4 text-right">Direct Cost (Rs.)</th>
                 <th className="py-3 px-4 text-right">Gross Profit (Rs.)</th>
@@ -204,7 +243,7 @@ export function FastMovingPartsAlertsTab({ data, activeRange = 'THIS_MONTH' }: F
             <tbody className="divide-y divide-slate-200 font-mono">
               {filteredFastMoving.length === 0 ? (
                 <tr>
-                  <td colSpan={11} className="py-8 text-center text-slate-500 font-sans">
+                  <td colSpan={12} className="py-8 text-center text-slate-500 font-sans">
                     No consumption data recorded for this period.
                   </td>
                 </tr>
@@ -252,6 +291,9 @@ export function FastMovingPartsAlertsTab({ data, activeRange = 'THIS_MONTH' }: F
                       <Badge variant="secondary" className="font-mono text-xs font-bold">
                         {part.totalQtyConsumed} {part.uom}
                       </Badge>
+                    </td>
+                    <td className="py-3 px-4 text-center font-sans text-emerald-700 font-medium">
+                      {part.turnoverRate || `${part.totalQtyConsumed} ${part.uom}`}
                     </td>
                     <td className="py-3 px-4 text-right font-bold text-slate-900">
                       {formatRs(part.totalRevenueRs)}
@@ -334,6 +376,7 @@ export function FastMovingPartsAlertsTab({ data, activeRange = 'THIS_MONTH' }: F
                 <th className="py-3 px-4 text-center">Current Stock</th>
                 <th className="py-3 px-4 text-center">Alert Level</th>
                 <th className="py-3 px-4 text-center">Deficit Qty</th>
+                <th className="py-3 px-4">Reorder Notes</th>
                 <th className="py-3 px-4 text-center">Stock Status</th>
                 <th className="py-3 px-4 text-center">Action</th>
               </tr>
@@ -341,7 +384,7 @@ export function FastMovingPartsAlertsTab({ data, activeRange = 'THIS_MONTH' }: F
             <tbody className="divide-y divide-slate-200">
               {filteredAlerts.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="py-8 text-center text-slate-500">
+                  <td colSpan={10} className="py-8 text-center text-slate-500">
                     No low-stock alerts. All inventory levels are healthy!
                   </td>
                 </tr>
@@ -379,6 +422,9 @@ export function FastMovingPartsAlertsTab({ data, activeRange = 'THIS_MONTH' }: F
                       </td>
                       <td className="py-3 px-4 text-center font-mono font-bold text-rose-700">
                         +{item.deficitQty} {item.uom}
+                      </td>
+                      <td className="py-3 px-4 text-[11px] text-slate-600 max-w-xs truncate" title={item.reorderNotes}>
+                        {item.reorderNotes || `Safety deficit: +${item.deficitQty}`}
                       </td>
                       <td className="py-3 px-4 text-center">
                         <Badge

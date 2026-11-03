@@ -6,10 +6,14 @@ import {
   Briefcase,
   Search,
   Sparkles,
+  Award,
 } from 'lucide-react';
 import { TechnicianVelocityReportData } from '../types';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import {
+  TechnicianEfficiencyScorecard,
+} from '@/design-system';
 
 interface TechnicianVelocityTabProps {
   data: TechnicianVelocityReportData;
@@ -48,7 +52,7 @@ export function TechnicianVelocityTab({ data }: TechnicianVelocityTabProps) {
               <Users className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-2xl font-black text-slate-900 font-mono tracking-tight">
+          <div className="text-2xl font-black text-slate-900 font-sans tabular-nums tracking-tight">
             {data.totalActiveTechnicians}
           </div>
           <div className="text-[11px] text-slate-500">
@@ -69,10 +73,10 @@ export function TechnicianVelocityTab({ data }: TechnicianVelocityTabProps) {
               <CheckCircle2 className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-2xl font-black text-emerald-950 font-mono tracking-tight">
+          <div className="text-2xl font-black text-emerald-950 font-sans tabular-nums tracking-tight">
             {data.overallCompletionRatePct.toFixed(1)}%
           </div>
-          <div className="text-[11px] text-slate-500 font-mono">
+          <div className="text-[11px] text-slate-500 font-sans tabular-nums">
             {data.totalCompletedTasks} of {data.totalAssignedTasks} tasks completed
           </div>
         </div>
@@ -90,7 +94,7 @@ export function TechnicianVelocityTab({ data }: TechnicianVelocityTabProps) {
               <Clock className="w-4 h-4" />
             </div>
           </div>
-          <div className="text-2xl font-black text-purple-950 font-mono tracking-tight">
+          <div className="text-2xl font-black text-purple-950 font-sans tabular-nums tracking-tight">
             {data.overallAvgTurnaroundDays} Days
           </div>
           <div className="text-[11px] text-purple-700">
@@ -119,6 +123,41 @@ export function TechnicianVelocityTab({ data }: TechnicianVelocityTabProps) {
           <div className="text-[11px] text-slate-500">
             Based on completed repair cards
           </div>
+        </div>
+      </div>
+
+      {/* Technician Efficiency Scorecards Suite */}
+      <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-4">
+        <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+          <div className="flex items-center gap-2">
+            <Award className="w-5 h-5 text-amber-600" />
+            <div>
+              <h3 className="text-sm font-bold text-slate-900 tracking-tight">
+                Technician Efficiency Scorecards
+              </h3>
+              <p className="text-[11px] text-slate-500">
+                Completed jobs count, average turnaround days vs promised days, on-time completion percentage bar, and labor efficiency index.
+              </p>
+            </div>
+          </div>
+          <Badge variant="outline" className="text-xs font-mono bg-slate-50 text-slate-700">
+            {data.technicians.length} Specialists Active
+          </Badge>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" data-testid="tech-scorecards-grid">
+          {data.technicians.map((tech) => (
+            <TechnicianEfficiencyScorecard
+              key={tech.technicianName}
+              technicianName={tech.technicianName}
+              completedJobsCount={tech.completedJobsCount}
+              avgTurnaroundDays={tech.avgTurnaroundDays}
+              avgPromisedDays={tech.avgEstimatedTargetDays}
+              onTimePercentage={tech.onTimePercentage ?? Math.round(tech.taskCompletionRatePct)}
+              laborEfficiencyIndex={tech.laborEfficiencyIndex ?? 100}
+              velocityStatus={tech.velocityStatus}
+            />
+          ))}
         </div>
       </div>
 
@@ -176,13 +215,14 @@ export function TechnicianVelocityTab({ data }: TechnicianVelocityTabProps) {
                 <th className="py-3 px-4 text-center">Active Jobs In-Progress</th>
                 <th className="py-3 px-4 text-center">Avg Target Days</th>
                 <th className="py-3 px-4 text-center">Avg Turnaround</th>
+                <th className="py-3 px-4 text-center">Efficiency Index</th>
                 <th className="py-3 px-4 text-center">Velocity Status</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 font-sans">
               {filteredTechnicians.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-8 text-center text-slate-500">
+                  <td colSpan={8} className="py-8 text-center text-slate-500">
                     No technicians found matching criteria.
                   </td>
                 </tr>
@@ -234,11 +274,11 @@ export function TechnicianVelocityTab({ data }: TechnicianVelocityTabProps) {
                         </div>
                       </td>
 
-                      <td className="py-3 px-4 text-center font-mono font-bold text-slate-900">
+                      <td className="py-3 px-4 text-center font-sans tabular-nums font-bold text-slate-900">
                         {tech.completedJobsCount}
                       </td>
 
-                      <td className="py-3 px-4 text-center font-mono">
+                      <td className="py-3 px-4 text-center font-sans tabular-nums">
                         <Badge
                           variant="secondary"
                           className={tech.activeInProgressJobsCount > 0 ? 'bg-amber-100 text-amber-900' : 'bg-slate-100 text-slate-600'}
@@ -247,16 +287,20 @@ export function TechnicianVelocityTab({ data }: TechnicianVelocityTabProps) {
                         </Badge>
                       </td>
 
-                      <td className="py-3 px-4 text-center font-mono text-slate-600">
+                      <td className="py-3 px-4 text-center font-sans tabular-nums text-slate-600">
                         {tech.avgEstimatedTargetDays > 0
                           ? `${tech.avgEstimatedTargetDays} Days`
                           : '—'}
                       </td>
 
-                      <td className="py-3 px-4 text-center font-mono font-bold text-slate-900">
+                      <td className="py-3 px-4 text-center font-sans tabular-nums font-bold text-slate-900">
                         {tech.avgTurnaroundDays > 0
                           ? `${tech.avgTurnaroundDays} Days`
                           : '—'}
+                      </td>
+
+                      <td className="py-3 px-4 text-center font-sans tabular-nums font-bold text-emerald-700">
+                        {tech.laborEfficiencyIndex ?? 100}%
                       </td>
 
                       <td className="py-3 px-4 text-center">
@@ -284,6 +328,7 @@ export function TechnicianVelocityTab({ data }: TechnicianVelocityTabProps) {
                   </td>
                   <td className="py-3 px-4 text-center font-mono">{data.overallAvgTargetDays} Days</td>
                   <td className="py-3 px-4 text-center font-mono">{data.overallAvgTurnaroundDays} Days</td>
+                  <td className="py-3 px-4 text-center font-mono">100%</td>
                   <td className="py-3 px-4 text-center">
                     <Badge variant="secondary" className="text-[10px]">
                       Average

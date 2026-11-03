@@ -4,10 +4,28 @@ import { Plus, ShoppingCart, X } from 'lucide-react';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';
 import { Button } from '@/components/ui/button';
+import { AppShellMasterLayout } from '@/design-system/components/navigation-shell-components';
 
 export function AppShell() {
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem('erp_sidebar_collapsed') === 'true';
+    } catch {
+      return false;
+    }
+  });
   const navigate = useNavigate();
+
+  const handleToggleSidebarCollapse = () => {
+    setIsSidebarCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('erp_sidebar_collapsed', String(next));
+      } catch {}
+      return next;
+    });
+  };
 
   // Close mobile navigation on Escape key
   useEffect(() => {
@@ -21,54 +39,47 @@ export function AppShell() {
   }, [isMobileNavOpen]);
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-slate-100 text-slate-900">
-      {/* Desktop Persistent Sidebar */}
-      <div className="hidden md:flex shrink-0">
-        <Sidebar />
-      </div>
-
-      {/* Mobile Drawer Navigation (Sheet Overlay) */}
-      {isMobileNavOpen && (
-        <div className="fixed inset-0 z-50 flex md:hidden screen-only no-print">
-          <div
-            className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs transition-opacity"
-            onClick={() => setIsMobileNavOpen(false)}
-            data-testid="mobile-overlay-backdrop"
-          />
-          <div className="relative flex flex-col w-4/5 max-w-xs bg-slate-900 shadow-2xl z-10">
-            <div className="absolute top-3 right-3">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setIsMobileNavOpen(false)}
-                className="text-slate-400 hover:text-white"
-                aria-label="Close Mobile Menu"
-                data-testid="close-mobile-nav"
-              >
-                <X className="w-5 h-5" />
-              </Button>
+    <AppShellMasterLayout
+      sidebar={
+        <Sidebar
+          isCollapsed={isSidebarCollapsed}
+          onToggleCollapse={handleToggleSidebarCollapse}
+        />
+      }
+      header={<Header onToggleMobile={() => setIsMobileNavOpen((prev) => !prev)} />}
+      mobileDrawer={
+        isMobileNavOpen ? (
+          <div className="fixed inset-0 z-50 flex md:hidden screen-only no-print">
+            <div
+              className="fixed inset-0 bg-slate-950/40 backdrop-blur-xs transition-opacity"
+              onClick={() => setIsMobileNavOpen(false)}
+              data-testid="mobile-overlay-backdrop"
+            />
+            <div className="relative flex flex-col w-64 max-w-xs bg-white shadow-2xl z-10 h-full border-r border-slate-900/[0.06]">
+              <div className="absolute top-3 right-3 z-20">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setIsMobileNavOpen(false)}
+                  className="text-slate-400 hover:text-slate-900"
+                  aria-label="Close Mobile Menu"
+                  data-testid="close-mobile-nav"
+                >
+                  <X className="w-5 h-5" />
+                </Button>
+              </div>
+              <Sidebar onCloseMobile={() => setIsMobileNavOpen(false)} />
             </div>
-            <Sidebar onCloseMobile={() => setIsMobileNavOpen(false)} />
           </div>
-        </div>
-      )}
-
-      {/* Content Column: Topbar + Main Scrollable Area + Global Quick Bar */}
-      <div className="flex flex-col flex-1 min-w-0 h-full overflow-hidden">
-        <Header onToggleMobile={() => setIsMobileNavOpen((prev) => !prev)} />
-
-        {/* Main Content Area */}
-        <main className="flex-1 overflow-y-auto bg-slate-100 focus:outline-none">
-          <Outlet />
-        </main>
-
-        {/* Global Bottom Floating Quick-Action Bar for Mobile & Compact Screens */}
+        ) : null
+      }
+      floatingActions={
         <div className="md:hidden fixed bottom-4 right-4 z-40 flex items-center gap-2 screen-only no-print">
           <Button
             variant="default"
             size="sm"
             onClick={() => navigate('/workshop/sheet/demo')}
-            className="shadow-lg bg-amber-600 hover:bg-amber-700 text-white rounded-full px-3.5 h-10 gap-1.5"
+            className="shadow-lg bg-[#F95700] hover:bg-[#EA580C] text-white rounded-full px-3.5 h-10 gap-1.5"
             data-testid="floating-new-sheet-btn"
           >
             <Plus className="w-4 h-4" />
@@ -78,14 +89,16 @@ export function AppShell() {
             variant="default"
             size="sm"
             onClick={() => navigate('/pos')}
-            className="shadow-lg bg-slate-900 hover:bg-slate-800 text-white rounded-full px-3.5 h-10 gap-1.5"
+            className="shadow-lg bg-[#0F172A] hover:bg-slate-800 text-white rounded-full px-3.5 h-10 gap-1.5"
             data-testid="floating-open-pos-btn"
           >
             <ShoppingCart className="w-4 h-4 text-amber-400" />
             <span className="text-xs font-semibold">POS</span>
           </Button>
         </div>
-      </div>
-    </div>
+      }
+    >
+      <Outlet />
+    </AppShellMasterLayout>
   );
 }

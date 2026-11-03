@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import {
   Printer,
   Receipt,
@@ -20,6 +21,10 @@ import {
 } from '@/types';
 import { calculateWorkshopFinancials, formatRs } from '@/utils/currency';
 import { useAuth } from '@/app/providers/AuthProvider';
+import {
+  RolePermissionGateWrapper,
+  RedactedCipherPlaceholder,
+} from '@/design-system/components/finance-privacy-components';
 import { VehicleLookupInput } from '../components/VehicleLookupInput';
 import { VehicleHistoricalRecord } from '../types';
 import { CatalogCombobox } from '@/features/catalog/components/CatalogCombobox';
@@ -330,80 +335,85 @@ export function InteractiveBenchPage() {
     });
   };
 
+  const location = useLocation();
+  const showDevSwitcher = new URLSearchParams(location.search).get('dev') === 'true';
+
   const handlePrint = () => {
     window.print();
   };
 
   return (
     <div className="pb-12" data-testid="interactive-bench-page">
-      {/* Workbench Sub-Navigation Bar */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4 screen-only no-print">
-        <div className="flex flex-wrap items-center justify-between border-b border-slate-300 pb-3 mb-6 gap-3">
-          <div className="flex flex-wrap gap-2">
-            <Button
-              variant={activeTab === 'tables' ? 'default' : 'secondary'}
-              size="sm"
-              onClick={() => setActiveTab('tables')}
-              className="text-xs font-semibold"
-            >
-              <FileSpreadsheet className="w-3.5 h-3.5 mr-1.5" />
-              1. Editable Workshop Tables (Keyboard Ready)
-            </Button>
-            <Button
-              variant={activeTab === 'a4print' ? 'default' : 'secondary'}
-              size="sm"
-              onClick={() => setActiveTab('a4print')}
-              className="text-xs font-semibold"
-            >
-              <Printer className="w-3.5 h-3.5 mr-1.5" />
-              2. A4 Workshop Print Preview
-            </Button>
-            <Button
-              variant={activeTab === 'posreceipt' ? 'default' : 'secondary'}
-              size="sm"
-              onClick={() => setActiveTab('posreceipt')}
-              className="text-xs font-semibold"
-            >
-              <Receipt className="w-3.5 h-3.5 mr-1.5" />
-              3. 80mm POS Thermal Receipt
-            </Button>
-            <Button
-              variant={activeTab === 'design-system' ? 'default' : 'secondary'}
-              size="sm"
-              onClick={() => setActiveTab('design-system')}
-              className="text-xs font-semibold"
-            >
-              <Sparkles className="w-3.5 h-3.5 mr-1.5" />
-              4. Design System Primitives
-            </Button>
-          </div>
+      {/* Workbench Sub-Navigation Bar (Available only in Dev Mode via ?dev=true) */}
+      {showDevSwitcher && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4 screen-only no-print">
+          <div className="flex flex-wrap items-center justify-between border-b border-slate-300 pb-3 mb-6 gap-3">
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant={activeTab === 'tables' ? 'default' : 'secondary'}
+                size="sm"
+                onClick={() => setActiveTab('tables')}
+                className="text-xs font-semibold"
+              >
+                <FileSpreadsheet className="w-3.5 h-3.5 mr-1.5" />
+                1. Editable Workshop Tables (Keyboard Ready)
+              </Button>
+              <Button
+                variant={activeTab === 'a4print' ? 'default' : 'secondary'}
+                size="sm"
+                onClick={() => setActiveTab('a4print')}
+                className="text-xs font-semibold"
+              >
+                <Printer className="w-3.5 h-3.5 mr-1.5" />
+                2. A4 Workshop Print Preview
+              </Button>
+              <Button
+                variant={activeTab === 'posreceipt' ? 'default' : 'secondary'}
+                size="sm"
+                onClick={() => setActiveTab('posreceipt')}
+                className="text-xs font-semibold"
+              >
+                <Receipt className="w-3.5 h-3.5 mr-1.5" />
+                3. 80mm POS Thermal Receipt
+              </Button>
+              <Button
+                variant={activeTab === 'design-system' ? 'default' : 'secondary'}
+                size="sm"
+                onClick={() => setActiveTab('design-system')}
+                className="text-xs font-semibold"
+              >
+                <Sparkles className="w-3.5 h-3.5 mr-1.5" />
+                4. Design System Primitives
+              </Button>
+            </div>
 
-          <div className="flex items-center gap-2">
-            <Button
-              variant="default"
-              size="sm"
-              onClick={handlePrint}
-              className="text-xs h-8 bg-blue-600 hover:bg-blue-700 text-white cursor-pointer"
-              data-testid="print-trigger-btn"
-            >
-              <Printer className="w-3.5 h-3.5 mr-1.5" /> Print Layout
-            </Button>
-            <div className="hidden sm:flex items-center space-x-1.5 text-xs bg-emerald-50 text-emerald-800 border border-emerald-200 px-3 py-1 rounded-full font-medium">
-              <ShieldCheck className="w-4 h-4 text-emerald-600" />
-              <span>Privacy Guard Active</span>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="default"
+                size="sm"
+                onClick={handlePrint}
+                className="text-xs h-8 bg-blue-600 hover:bg-blue-700 text-white cursor-pointer"
+                data-testid="print-trigger-btn"
+              >
+                <Printer className="w-3.5 h-3.5 mr-1.5" /> Print Layout
+              </Button>
+              <div className="hidden sm:flex items-center space-x-1.5 text-xs bg-emerald-50 text-emerald-800 border border-emerald-200 px-3 py-1 rounded-full font-medium">
+                <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                <span>Privacy Guard Active</span>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* TAB 1: EDITABLE WORKSHOP TABLES */}
       {activeTab === 'tables' && (
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 screen-only no-print">
-          <div className="bg-white rounded-lg border border-slate-200 p-4 mb-6 shadow-xs">
-            <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 pb-4 mb-4">
+        <main className="max-w-7xl xl:max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 screen-only no-print">
+          <div className="bg-white rounded-xl border border-slate-200/80 p-4 sm:p-4.5 mb-4 shadow-[0_1px_2px_rgba(15,23,42,0.03)]">
+            <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 pb-3.5 mb-3.5">
               <div>
-                <div className="flex items-center space-x-2 mb-1">
-                  <h2 className="text-lg font-bold text-slate-900">
+                <div className="flex items-center space-x-2 mb-0.5">
+                  <h2 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
                     Workshop Repair Sheet: {jobSheet.header.vehicleNumber}
                   </h2>
                   <Badge
@@ -460,34 +470,36 @@ export function InteractiveBenchPage() {
                 </div>
               </div>
 
-              {/* Internal Buying Cost & Gross Profit: Strictly Enforced */}
-              {isCostProfitVisible && permissions.canViewCosts && permissions.canViewGrossProfit ? (
-                <>
-                  <div className="bg-amber-50/70 border border-amber-200 p-3 rounded-md">
-                    <div className="text-amber-800 font-medium flex items-center">
-                      <Lock className="w-3 h-3 mr-1" /> Total Direct Buying Cost
+              {/* Internal Buying Cost & Gross Profit: Strictly Enforced via RolePermissionGateWrapper */}
+              <RolePermissionGateWrapper allowedRoles={['OWNER', 'WORKSHOP_MANAGER']}>
+                {isCostProfitVisible && permissions.canViewCosts && permissions.canViewGrossProfit ? (
+                  <>
+                    <div className="bg-amber-50/70 border border-amber-200 p-3 rounded-md">
+                      <div className="text-amber-800 font-medium flex items-center">
+                        <Lock className="w-3 h-3 mr-1" /> Total Direct Buying Cost
+                      </div>
+                      <div className="text-base font-bold text-amber-950 mt-1 font-mono">
+                        <RedactedCipherPlaceholder value={jobSheet.financials.totalBuyingCostRs} isRedacted={false} />
+                      </div>
+                      <div className="text-[11px] text-amber-700 mt-0.5">Parts + Sublet direct cost</div>
                     </div>
-                    <div className="text-base font-bold text-amber-950 mt-1">
-                      {formatRs(jobSheet.financials.totalBuyingCostRs)}
-                    </div>
-                    <div className="text-[11px] text-amber-700 mt-0.5">Parts + Sublet direct cost</div>
-                  </div>
 
-                  <div className="bg-emerald-50/70 border border-emerald-200 p-3 rounded-md">
-                    <div className="text-emerald-800 font-medium">Gross Profit & Margin</div>
-                    <div className="text-base font-bold text-emerald-950 mt-1">
-                      {formatRs(jobSheet.financials.grossProfitRs)}
+                    <div className="bg-emerald-50/70 border border-emerald-200 p-3 rounded-md">
+                      <div className="text-emerald-800 font-medium">Gross Profit & Margin</div>
+                      <div className="text-base font-bold text-emerald-950 mt-1 font-mono">
+                        <RedactedCipherPlaceholder value={jobSheet.financials.grossProfitRs} isRedacted={false} />
+                      </div>
+                      <div className="text-[11px] text-emerald-700 mt-0.5">
+                        Margin: <span className="font-bold">{jobSheet.financials.grossMarginPct}%</span>
+                      </div>
                     </div>
-                    <div className="text-[11px] text-emerald-700 mt-0.5">
-                      Margin: <span className="font-bold">{jobSheet.financials.grossMarginPct}%</span>
-                    </div>
+                  </>
+                ) : (
+                  <div className="col-span-2 bg-slate-50 border border-dashed border-slate-300 p-3 rounded-md flex items-center justify-center text-slate-400 italic">
+                    Internal Buying Costs & Profit hidden (Staff View)
                   </div>
-                </>
-              ) : (
-                <div className="col-span-2 bg-slate-50 border border-dashed border-slate-300 p-3 rounded-md flex items-center justify-center text-slate-400 italic">
-                  Internal Buying Costs & Profit hidden (Staff View)
-                </div>
-              )}
+                )}
+              </RolePermissionGateWrapper>
 
               <div className="bg-blue-50 border border-blue-200 p-3 rounded-md">
                 <div className="text-blue-800 font-medium">Split Billing Balance Due</div>
@@ -550,11 +562,11 @@ export function InteractiveBenchPage() {
             </div>
           </div>
 
-          {/* Exact 12-Field Manual Intake Header Grid with Smart Vehicle Lookup */}
+          {/* Intake Header with Vehicle Lookup */}
           <div className="bg-white rounded-lg border border-slate-200 p-4 mb-6 shadow-xs space-y-3">
             <div className="flex items-center justify-between border-b border-slate-100 pb-2">
               <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-                <span>Vehicle & Customer Intake (Zero CRM Friction)</span>
+                <span>Vehicle & Customer Details</span>
               </h3>
               <span className="text-[11px] text-slate-500">
                 Type vehicle plate to auto-populate from past repair history
@@ -563,7 +575,7 @@ export function InteractiveBenchPage() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-xs">
               <div>
-                <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">
+                <label className="block text-[11px] font-medium text-slate-500 mb-1">
                   Vehicle Number *
                 </label>
                 <VehicleLookupInput
@@ -572,156 +584,127 @@ export function InteractiveBenchPage() {
                   onPopulate={handleVehiclePopulate}
                   placeholder="e.g. CBA-1234"
                   data-testid="header-vehicle-number-input"
+                  className="h-8 text-xs px-2.5 rounded-lg border border-slate-200 bg-white focus:border-slate-900 focus:ring-1 focus:ring-slate-900"
                 />
               </div>
 
               <div>
-                <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">
+                <label className="block text-[11px] font-medium text-slate-500 mb-1">
                   Vehicle Make
                 </label>
                 <Input
                   value={jobSheet.header.vehicleMake}
                   onChange={(e) => handleHeaderFieldChange('vehicleMake', e.target.value)}
                   placeholder="e.g. Toyota"
-                  className="h-9 text-xs"
+                  className="h-8 text-xs px-2.5 rounded-lg border border-slate-200 bg-white focus:border-slate-900 focus:ring-1 focus:ring-slate-900"
                   data-testid="header-vehicle-make-input"
                 />
               </div>
 
               <div>
-                <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">
+                <label className="block text-[11px] font-medium text-slate-500 mb-1">
                   Vehicle Model
                 </label>
                 <Input
                   value={jobSheet.header.vehicleModel}
                   onChange={(e) => handleHeaderFieldChange('vehicleModel', e.target.value)}
                   placeholder="e.g. Corolla Axio"
-                  className="h-9 text-xs"
+                  className="h-8 text-xs px-2.5 rounded-lg border border-slate-200 bg-white focus:border-slate-900 focus:ring-1 focus:ring-slate-900"
                   data-testid="header-vehicle-model-input"
                 />
               </div>
 
               <div>
-                <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">
+                <label className="block text-[11px] font-medium text-slate-500 mb-1">
                   Year of Make
                 </label>
                 <Input
                   value={jobSheet.header.yearOfMake}
                   onChange={(e) => handleHeaderFieldChange('yearOfMake', e.target.value)}
                   placeholder="e.g. 2018"
-                  className="h-9 text-xs font-mono"
+                  className="h-8 text-xs px-2.5 rounded-lg border border-slate-200 bg-white focus:border-slate-900 focus:ring-1 focus:ring-slate-900 font-mono"
                   data-testid="header-year-input"
                 />
               </div>
 
               <div>
-                <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">
+                <label className="block text-[11px] font-medium text-slate-500 mb-1">
                   Vehicle Color
                 </label>
                 <Input
                   value={jobSheet.header.vehicleColor}
                   onChange={(e) => handleHeaderFieldChange('vehicleColor', e.target.value)}
                   placeholder="e.g. Pearl White"
-                  className="h-9 text-xs"
+                  className="h-8 text-xs px-2.5 rounded-lg border border-slate-200 bg-white focus:border-slate-900 focus:ring-1 focus:ring-slate-900"
                   data-testid="header-color-input"
                 />
               </div>
 
               <div>
-                <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">
+                <label className="block text-[11px] font-medium text-slate-500 mb-1">
                   Chassis Number
                 </label>
                 <Input
                   value={jobSheet.header.chassisNumber}
                   onChange={(e) => handleHeaderFieldChange('chassisNumber', e.target.value.toUpperCase())}
                   placeholder="e.g. NZE161-1234567"
-                  className="h-9 text-xs font-mono uppercase"
+                  className="h-8 text-xs px-2.5 rounded-lg border border-slate-200 bg-white focus:border-slate-900 focus:ring-1 focus:ring-slate-900 font-mono uppercase"
                   data-testid="header-chassis-input"
                 />
               </div>
 
               <div>
-                <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">
+                <label className="block text-[11px] font-medium text-slate-500 mb-1">
                   Days For Completion
                 </label>
                 <Input
                   value={jobSheet.header.daysForCompletion}
                   onChange={(e) => handleHeaderFieldChange('daysForCompletion', e.target.value)}
                   placeholder="e.g. 4 Days"
-                  className="h-9 text-xs"
+                  className="h-8 text-xs px-2.5 rounded-lg border border-slate-200 bg-white focus:border-slate-900 focus:ring-1 focus:ring-slate-900"
                   data-testid="header-days-input"
                 />
               </div>
 
               <div>
-                <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">
+                <label className="block text-[11px] font-medium text-slate-500 mb-1">
                   Nature of Repair
                 </label>
                 <Input
                   value={jobSheet.header.natureOfRepair}
                   onChange={(e) => handleHeaderFieldChange('natureOfRepair', e.target.value)}
                   placeholder="e.g. Accident Damage / Bumper Repair"
-                  className="h-9 text-xs"
+                  className="h-8 text-xs px-2.5 rounded-lg border border-slate-200 bg-white focus:border-slate-900 focus:ring-1 focus:ring-slate-900"
                   data-testid="header-nature-input"
                 />
               </div>
 
               <div className="sm:col-span-2">
-                <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">
+                <label className="block text-[11px] font-medium text-slate-500 mb-1">
                   Name of Insurance
                 </label>
                 <Input
                   value={jobSheet.header.insuranceName}
                   onChange={(e) => handleHeaderFieldChange('insuranceName', e.target.value)}
                   placeholder="e.g. Sri Lanka Insurance Corporation (SLIC)"
-                  className="h-9 text-xs"
+                  className="h-8 text-xs px-2.5 rounded-lg border border-slate-200 bg-white focus:border-slate-900 focus:ring-1 focus:ring-slate-900"
                   data-testid="header-insurance-input"
                 />
               </div>
 
               <div className="sm:col-span-2">
-                <label className="block text-[11px] font-bold text-slate-600 uppercase mb-1">
+                <label className="block text-[11px] font-medium text-slate-500 mb-1">
                   Customer Information (Name, Phone, Address)
                 </label>
                 <Input
                   value={jobSheet.header.customerInfo}
                   onChange={(e) => handleHeaderFieldChange('customerInfo', e.target.value)}
                   placeholder="e.g. Nimal Perera - 077 123 4567 / Colombo 09"
-                  className="h-9 text-xs"
+                  className="h-8 text-xs px-2.5 rounded-lg border border-slate-200 bg-white focus:border-slate-900 focus:ring-1 focus:ring-slate-900"
                   data-testid="header-customer-input"
                 />
               </div>
             </div>
-          </div>
-
-          {/* Quick Insert from Catalog Combobox */}
-          <div className="bg-amber-50/60 rounded-lg border border-amber-200 p-3 mb-6 shadow-xs flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-            <div className="shrink-0 flex items-center gap-2">
-              <Package className="w-4 h-4 text-amber-700" />
-              <span className="text-xs font-bold text-amber-950 uppercase tracking-wider">
-                Quick Insert from Catalog:
-              </span>
-            </div>
-            <div className="flex-1">
-              <CatalogCombobox
-                onSelect={handleCatalogItemSelect}
-                onSelectCustom={handleCustomItemAdd}
-                placeholder="Search catalog parts, fluids, or labor presets to add row..."
-              />
-            </div>
-          </div>
-
-          <div className="mb-4 flex items-center justify-between text-xs text-slate-600 bg-slate-200/70 px-4 py-2 rounded-md">
-            <span>
-              💡 <strong>Keyboard Ergonomics:</strong> Type amounts in any row and press{' '}
-              <kbd className="px-1.5 py-0.5 bg-white border border-slate-300 rounded font-mono text-[10px]">
-                Enter
-              </kbd>{' '}
-              to automatically append a new row and focus its description field.
-            </span>
-            <span className="font-semibold text-slate-700">
-              {jobSheet.lines.length} Total Lines Active
-            </span>
           </div>
 
           {/* Section 1: Labor - Remove & Reassemble */}
@@ -746,16 +729,32 @@ export function InteractiveBenchPage() {
             onItemsChange={handleLinesChange}
           />
 
-          {/* Section 3: Replacement */}
-          <WorkshopTable
-            category="REPLACEMENT"
-            title="3. Replacement Parts"
-            sectionNumber={3}
-            items={jobSheet.lines}
-            isCostProfitVisible={isCostProfitVisible}
-            isJobCardMode={jobSheet.docStage === 'JOB_CARD'}
-            onItemsChange={handleLinesChange}
-          />
+          {/* Section 3: Replacement Parts with Compact Inline Catalog Search */}
+          <div className="space-y-2">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1 no-print">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700 uppercase tracking-wider">
+                <Package className="w-3.5 h-3.5 text-slate-500" />
+                <span>3. Replacement Parts</span>
+              </div>
+              <div className="w-full sm:w-80 lg:w-96">
+                <CatalogCombobox
+                  onSelect={handleCatalogItemSelect}
+                  onSelectCustom={handleCustomItemAdd}
+                  placeholder="Quick add part from catalog (SKU, name)..."
+                />
+              </div>
+            </div>
+
+            <WorkshopTable
+              category="REPLACEMENT"
+              title="3. Replacement Parts"
+              sectionNumber={3}
+              items={jobSheet.lines}
+              isCostProfitVisible={isCostProfitVisible}
+              isJobCardMode={jobSheet.docStage === 'JOB_CARD'}
+              onItemsChange={handleLinesChange}
+            />
+          </div>
         </main>
       )}
 
@@ -768,7 +767,7 @@ export function InteractiveBenchPage() {
                 A4 Laser Print Layout ({jobSheet.docStage})
               </h3>
               <p className="text-xs text-slate-500">
-                12-Field Grid, 3-Section Format, Top Service Banner & Cost Redaction Active
+                Standardized Grid, 3-Section Format, Service Banner & Cost Redaction Active
               </p>
             </div>
             <div className="flex items-center space-x-2">
@@ -834,7 +833,7 @@ export function InteractiveBenchPage() {
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 screen-only no-print space-y-8">
           <div className="bg-white rounded-lg border border-slate-200 p-6 shadow-xs">
             <h2 className="text-base font-bold text-slate-900 mb-1">
-              Phase 1 Design System Primitives
+              Design System Primitives
             </h2>
             <p className="text-xs text-slate-500 mb-6">
               Tailwind CSS & shadcn/ui compliant reusable atoms with high contrast and optical alignment.

@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
-  FileSpreadsheet,
   Plus,
   Search,
   Printer,
@@ -10,13 +9,13 @@ import {
   ExternalLink,
   RefreshCw,
   Car,
-  CheckCircle2,
   FileCheck,
   CreditCard,
+  Receipt,
+  MoreVertical,
+  Wrench,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
 import {
   Dialog,
   DialogHeader,
@@ -38,6 +37,8 @@ import { A4WorkshopPrint } from '@/components/print/A4WorkshopPrint';
 import { PaymentCollectionModal } from '../components/PaymentCollectionModal';
 import { buildWhatsAppShareUrl } from '@/utils/whatsapp';
 import { cn } from '@/utils/cn';
+import { PageContainer } from '@/components/layouts';
+import { PageHeader } from '@/components/ui/page-header';
 
 export function WorkshopJobsPage() {
   const { role, user, permissions } = useAuth();
@@ -52,6 +53,7 @@ export function WorkshopJobsPage() {
   const [revision, setRevision] = useState(0);
   const [activePrintJob, setActivePrintJob] = useState<WorkshopJobSheet | null>(null);
   const [activePaymentJob, setActivePaymentJob] = useState<WorkshopJobSheet | null>(null);
+  const [openMenuJobId, setOpenMenuJobId] = useState<string | null>(null);
 
   // Sync search param when URL queryParam changes
   useEffect(() => {
@@ -70,6 +72,23 @@ export function WorkshopJobsPage() {
     }
     return [];
   }, [search, filterStage, filterStatus, revision]);
+
+  const allJobs = useMemo(() => {
+    if (workshopJobRepository.filterSync) {
+      return workshopJobRepository.filterSync({});
+    }
+    return [];
+  }, [revision]);
+
+  const stageCounts = useMemo(() => {
+    return {
+      ALL: allJobs.length,
+      QUOTATION: allJobs.filter((j) => j.docStage === 'QUOTATION').length,
+      ESTIMATE: allJobs.filter((j) => j.docStage === 'ESTIMATE').length,
+      JOB_CARD: allJobs.filter((j) => j.docStage === 'JOB_CARD').length,
+      INVOICE: allJobs.filter((j) => j.docStage === 'INVOICE').length,
+    };
+  }, [allJobs]);
 
   const handleSearchChange = (val: string) => {
     setSearch(val);
@@ -246,79 +265,105 @@ export function WorkshopJobsPage() {
   };
 
   return (
-    <div
-      className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 space-y-6"
-      data-testid="workshop-jobs-page"
-    >
-      {/* Title & Action Header */}
-      <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4 no-print">
-        <div>
-          <h1 className="text-xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-            <FileSpreadsheet className="w-6 h-6 text-amber-600" />
-            Workshop Jobs & Collision Estimates
-          </h1>
-          <p className="text-xs text-slate-500 mt-1">
-            Searchable repository for Quotations, Estimates, Job Cards, and Invoices.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleResetSeeds}
-            className="text-xs h-8 text-slate-600 gap-1 border-slate-300"
-            title="Reset to default collision seeds"
-          >
-            <RefreshCw className="w-3.5 h-3.5" />
-            <span className="hidden md:inline">Reset Seeds</span>
-          </Button>
-
-          <Link to="/workshop/sheet">
+    <PageContainer maxWidth="standard" className="xl:max-w-[1600px]" dataTestId="workshop-jobs-page">
+      {/* 1. Standardized Modern Bento Command Card Header */}
+      <PageHeader
+        glowColor="orange"
+        icon={<Wrench className="w-5 h-5 text-[#F95700]" />}
+        iconClassName="bg-orange-50/80 border-orange-200/80 text-[#F95700]"
+        kicker="WORKSHOP OPERATIONS"
+        title="Workshop Jobs & Collision Estimates"
+        badge={
+          <span className="px-2.5 py-0.5 rounded-full text-[11px] font-mono font-semibold bg-orange-50 text-[#F95700] border border-orange-200/60">
+            {stageCounts.ALL} Records
+          </span>
+        }
+        description="Searchable repository for quotations, collision estimates, active job cards, and invoices."
+        actions={
+          <>
             <Button
-              variant="default"
+              variant="outline"
               size="sm"
-              className="bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs h-8 gap-1.5 shadow-xs"
-              data-testid="create-new-sheet-btn"
+              onClick={handleResetSeeds}
+              className="text-xs h-8 text-slate-700 gap-1.5 border-slate-200/90 bg-white hover:bg-slate-50 rounded-lg shadow-2xs font-semibold px-3"
+              title="Reset to default collision seeds"
             >
-              <Plus className="w-4 h-4" />
-              <span>+ New Repair Sheet</span>
+              <RefreshCw className="w-3.5 h-3.5" />
+              <span className="hidden md:inline">Reset Seeds</span>
             </Button>
-          </Link>
-        </div>
-      </div>
 
-      {/* Search & Filter Controls */}
-      <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs space-y-4 no-print">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-          {/* Search Input */}
-          <div className="relative flex-1">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <Input
+            <Link to="/workshop/sheet">
+              <Button
+                variant="default"
+                size="sm"
+                className="bg-[#F95700] hover:bg-[#EA580C] text-white font-semibold text-xs h-8 px-3.5 gap-1.5 rounded-lg shadow-xs"
+                data-testid="create-new-sheet-btn"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>New Repair Sheet</span>
+              </Button>
+            </Link>
+          </>
+        }
+      />
+
+      {/* Unified Table Card (Executive Command Strip + Table + Pagination) */}
+      <div className="bg-white rounded-xl border border-slate-200/80 shadow-[0_1px_2px_rgba(15,23,42,0.03)] overflow-hidden no-print">
+        {/* Card Top Row: Stage Tabs with Count Pills */}
+        <div className="flex items-center gap-5 px-4 pt-2.5 border-b border-slate-200/70 overflow-x-auto">
+          {[
+            { label: 'All', value: 'ALL', count: stageCounts.ALL },
+            { label: 'Quotations', value: 'QUOTATION', count: stageCounts.QUOTATION },
+            { label: 'Estimates', value: 'ESTIMATE', count: stageCounts.ESTIMATE },
+            { label: 'Job Cards', value: 'JOB_CARD', count: stageCounts.JOB_CARD },
+            { label: 'Invoices', value: 'INVOICE', count: stageCounts.INVOICE },
+          ].map((tab) => (
+            <button
+              key={tab.value}
+              type="button"
+              onClick={() => setFilterStage(tab.value)}
+              className={cn(
+                'pb-2.5 text-xs font-semibold border-b-2 transition-colors flex items-center gap-1.5 whitespace-nowrap cursor-pointer',
+                filterStage === tab.value
+                  ? 'border-slate-900 text-slate-900'
+                  : 'border-transparent text-slate-500 hover:text-slate-800'
+              )}
+              data-testid={`stage-tab-${tab.value.toLowerCase()}`}
+            >
+              <span>{tab.label}</span>
+              <span className="bg-slate-100 text-slate-600 text-[10px] px-1.5 py-0.5 rounded-full font-sans tabular-nums">
+                {tab.count}
+              </span>
+            </button>
+          ))}
+        </div>
+
+        {/* Card Second Row: Search & Status Filter Toolbar */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-2.5 border-b border-slate-100 bg-slate-50/40">
+          <div className="relative flex-1 max-w-md">
+            <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            <input
               type="text"
               value={search}
               onChange={(e) => handleSearchChange(e.target.value)}
-              placeholder="Search by vehicle plate (e.g. CAB-4521), Job #, Customer, or Insurance..."
-              className="pl-9 h-9 text-xs"
+              placeholder="Search by vehicle plate, job #, customer, or insurance..."
+              className="w-full h-8 pl-8 pr-3 text-xs bg-white border border-slate-200/90 rounded-lg text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-slate-900 focus:ring-1 focus:ring-slate-900"
               data-testid="jobs-search-input"
             />
           </div>
 
-          {/* Status Dropdown */}
           <div className="flex items-center gap-2">
-            <label className="text-xs font-semibold text-slate-600 whitespace-nowrap">
-              Floor Status:
-            </label>
+            <span className="text-[11px] font-medium text-slate-500 hidden md:inline">Floor status:</span>
             <select
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value)}
-              className="h-9 text-xs bg-slate-50 border border-slate-300 rounded-lg px-2.5 font-medium text-slate-800 outline-none cursor-pointer"
+              className="h-8 text-xs bg-white border border-slate-200/90 rounded-lg px-2.5 font-medium text-slate-700 outline-none cursor-pointer hover:border-slate-300 focus:border-slate-900"
               data-testid="jobs-status-select"
             >
-              <option value="ALL">All Statuses</option>
+              <option value="ALL">All Floor Statuses</option>
               <option value="DRAFT">Draft</option>
               <option value="PENDING_INSURANCE_APPROVAL">Pending Insurance</option>
-              <option value="APPROVED_IN_PROGRESS">Approved / In Progress</option>
+              <option value="APPROVED_IN_PROGRESS">Approved in Progress</option>
               <option value="WAITING_FOR_PARTS">Waiting for Parts</option>
               <option value="QUALITY_CHECK">Quality Check</option>
               <option value="READY_FOR_DELIVERY">Ready for Delivery</option>
@@ -327,35 +372,7 @@ export function WorkshopJobsPage() {
           </div>
         </div>
 
-        {/* Stage Filter Tabs */}
-        <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-slate-100">
-          {[
-            { label: 'All Documents', value: 'ALL' },
-            { label: 'Quotations', value: 'QUOTATION' },
-            { label: 'Estimates', value: 'ESTIMATE' },
-            { label: 'Job Cards', value: 'JOB_CARD' },
-            { label: 'Invoices', value: 'INVOICE' },
-          ].map((tab) => (
-            <button
-              key={tab.value}
-              type="button"
-              onClick={() => setFilterStage(tab.value)}
-              className={cn(
-                'px-3 py-1 text-xs font-semibold rounded-lg transition-all cursor-pointer',
-                filterStage === tab.value
-                  ? 'bg-slate-900 text-white shadow-2xs'
-                  : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-              )}
-              data-testid={`stage-tab-${tab.value.toLowerCase()}`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Jobs List / Table */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden no-print">
+        {/* Jobs List / Table */}
         {jobs.length === 0 ? (
           <div className="p-12 text-center space-y-3">
             <Car className="w-10 h-10 text-slate-300 mx-auto" />
@@ -367,7 +384,7 @@ export function WorkshopJobsPage() {
             </p>
             <div className="pt-2">
               <Link to="/workshop/sheet">
-                <Button variant="default" size="sm" className="bg-amber-600 hover:bg-amber-700 text-xs">
+                <Button variant="default" size="sm" className="bg-[#F95700] hover:bg-[#EA580C] text-xs font-semibold rounded-lg">
                   <Plus className="w-3.5 h-3.5 mr-1" />
                   + Create Repair Sheet
                 </Button>
@@ -378,15 +395,16 @@ export function WorkshopJobsPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs border-collapse">
               <thead>
-                <tr className="border-b border-slate-200 bg-slate-50 text-[11px] font-bold uppercase tracking-wider text-slate-600">
-                  <th className="py-2.5 px-3">Job Details</th>
-                  <th className="py-2.5 px-3">Vehicle Details</th>
-                  <th className="py-2.5 px-3">Customer & Insurance</th>
-                  <th className="py-2.5 px-3">Stage & Status</th>
+                <tr className="border-b border-slate-200/70 bg-slate-50/60 text-[11px] font-semibold text-slate-500">
+                  <th className="py-3 px-4 whitespace-nowrap">Job ID</th>
+                  <th className="py-3 px-4 whitespace-nowrap">Vehicle</th>
+                  <th className="py-3 px-4 whitespace-nowrap">Customer & insurer</th>
+                  <th className="py-3 px-4 whitespace-nowrap">Stage</th>
+                  <th className="py-3 px-4 whitespace-nowrap">Status</th>
                   {role !== 'TECHNICIAN' && (
-                    <th className="py-2.5 px-3 text-right">Amount (Rs.)</th>
+                    <th className="py-3 px-4 text-right whitespace-nowrap">Amount (Rs.)</th>
                   )}
-                  <th className="py-2.5 px-3 text-center">Actions</th>
+                  <th className="py-3 px-4 text-right whitespace-nowrap">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -396,169 +414,253 @@ export function WorkshopJobsPage() {
                     className="hover:bg-slate-50/80 transition-colors"
                     data-testid={`job-row-${job.id}`}
                   >
-                    {/* Job Details */}
-                    <td className="py-3 px-3 align-top">
-                      <div className="font-bold font-mono text-slate-900">{job.jobNumber}</div>
-                      <div className="text-[11px] text-slate-400">{job.header.date}</div>
+                    {/* Column 1: Job ID */}
+                    <td className="py-3 px-4 align-top whitespace-nowrap">
+                      <div className="font-mono text-xs font-semibold text-slate-900 whitespace-nowrap">
+                        {job.jobNumber}
+                      </div>
+                      <div className="text-[11px] text-slate-400 mt-0.5 whitespace-nowrap">
+                        {job.header.date}
+                      </div>
                     </td>
 
-                    {/* Vehicle Details */}
-                    <td className="py-3 px-3 align-top">
-                      <div className="font-bold text-slate-900 uppercase font-mono tracking-wide">
-                        {job.header.vehicleNumber || '-'}
-                      </div>
-                      <div className="text-[11px] text-slate-600">
-                        {[job.header.vehicleMake, job.header.vehicleModel].filter(Boolean).join(' ') ||
-                          '-'}
+                    {/* Column 2: Vehicle */}
+                    <td className="py-3 px-4 align-top min-w-[200px]">
+                      <div className="flex items-center gap-2 whitespace-nowrap">
+                        <span className="inline-flex items-center bg-slate-900 text-white font-mono text-[11px] font-semibold px-2 py-0.5 rounded whitespace-nowrap">
+                          {job.header.vehicleNumber || '-'}
+                        </span>
+                        <span className="font-semibold text-xs text-slate-900 whitespace-nowrap">
+                          {[job.header.vehicleMake, job.header.vehicleModel].filter(Boolean).join(' ') || '-'}
+                        </span>
                       </div>
                       {job.header.natureOfRepair && (
-                        <div className="text-[10px] text-slate-400 line-clamp-1 max-w-xs mt-0.5">
+                        <div className="text-xs text-slate-500 truncate max-w-[240px] mt-1">
                           {job.header.natureOfRepair}
                         </div>
                       )}
                     </td>
 
-                    {/* Customer & Insurance */}
-                    <td className="py-3 px-3 align-top">
-                      <div className="font-medium text-slate-800 line-clamp-1 max-w-xs">
+                    {/* Column 3: Customer & Insurer */}
+                    <td className="py-3 px-4 align-top min-w-[180px]">
+                      <div className="text-xs font-medium text-slate-800 truncate max-w-[220px]">
                         {job.header.customerInfo || 'Walk-in Customer'}
                       </div>
-                      <div className="text-[11px] text-blue-700 font-semibold line-clamp-1 max-w-xs">
+                      <div className="text-xs text-slate-500 truncate max-w-[220px] mt-0.5">
                         {job.header.insuranceName || 'Direct / Cash'}
                       </div>
                     </td>
 
-                    {/* Stage & Status Badges */}
-                    <td className="py-3 px-3 align-top space-y-1">
-                      <div>
-                        <Badge
-                          variant={
-                            job.docStage === 'INVOICE'
-                              ? 'success'
-                              : job.docStage === 'JOB_CARD'
-                              ? 'info'
-                              : 'warning'
-                          }
-                          className="font-bold uppercase tracking-wider text-[9px]"
-                        >
-                          {job.docStage}
-                        </Badge>
-                      </div>
-                      <div>
-                        <Badge
-                          variant={
+                    {/* Column 4: Stage */}
+                    <td className="py-3 px-4 align-top whitespace-nowrap">
+                      <span
+                        className={cn(
+                          'inline-flex items-center whitespace-nowrap rounded-md px-2 py-0.5 text-[11px] font-medium border',
+                          job.docStage === 'INVOICE'
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200/60'
+                            : job.docStage === 'JOB_CARD'
+                            ? 'bg-indigo-50 text-indigo-700 border border-indigo-200/60'
+                            : job.docStage === 'ESTIMATE'
+                            ? 'bg-blue-50 text-blue-700 border border-blue-200/60'
+                            : 'bg-amber-50 text-amber-700 border border-amber-200/60'
+                        )}
+                      >
+                        {job.docStage === 'JOB_CARD'
+                          ? 'Job Card'
+                          : job.docStage === 'INVOICE'
+                          ? 'Invoice'
+                          : job.docStage === 'ESTIMATE'
+                          ? 'Estimate'
+                          : 'Quotation'}
+                      </span>
+                    </td>
+
+                    {/* Column 5: Status */}
+                    <td className="py-3 px-4 align-top whitespace-nowrap space-y-1">
+                      <div className="flex items-center gap-1.5 whitespace-nowrap">
+                        <span
+                          className={cn(
+                            'w-1.5 h-1.5 rounded-full shrink-0',
                             job.paymentStatus === 'PAID'
-                              ? 'success'
+                              ? 'bg-emerald-500'
                               : job.paymentStatus === 'PARTIALLY_PAID'
-                              ? 'warning'
-                              : 'destructive'
-                          }
-                          className="font-bold uppercase tracking-wider text-[8px]"
-                          data-testid={`payment-status-badge-${job.id}`}
-                        >
-                          {job.paymentStatus || 'UNPAID'}
-                        </Badge>
+                              ? 'bg-amber-500'
+                              : 'bg-rose-500'
+                          )}
+                        />
+                        <span className="text-[11px] font-medium text-slate-700">
+                          {job.paymentStatus === 'PAID'
+                            ? 'Paid'
+                            : job.paymentStatus === 'PARTIALLY_PAID'
+                            ? 'Partially Paid'
+                            : 'Unpaid'}
+                        </span>
                       </div>
-                      <div className="text-[10px] text-slate-500 font-mono">
-                        {job.floorStatus.replace(/_/g, ' ')}
+                      <div className="text-xs text-slate-600 whitespace-nowrap">
+                        {job.floorStatus
+                          .replace(/_/g, ' ')
+                          .toLowerCase()
+                          .replace(/\b\w/g, (c) => c.toUpperCase())}
                       </div>
                     </td>
 
-                    {/* Amount (Hidden for TECHNICIAN) */}
+                    {/* Column 6: Amount */}
                     {role !== 'TECHNICIAN' && (
-                      <td className="py-3 px-3 align-top text-right font-black text-slate-900">
-                        {formatRs(job.financials?.grandTotalSalesRs || 0)}
+                      <td className="py-3 px-4 align-top text-right whitespace-nowrap font-sans tabular-nums text-sm font-semibold text-slate-900">
+                        {formatRs(job.financials?.grandTotalSalesRs || 0).replace(' ', '\u00A0')}
                       </td>
                     )}
 
-                    {/* Actions */}
-                    <td className="py-3 px-3 align-top text-center">
-                      <div className="flex items-center justify-center gap-1">
-                        {permissions.canManageJobCards && (job.docStage === 'QUOTATION' || job.docStage === 'ESTIMATE') && (
+                    {/* Column 7: Actions */}
+                    <td className="py-3 px-4 align-top text-right whitespace-nowrap">
+                      <div className="inline-flex items-center justify-end gap-1.5">
+                        {/* 1. Primary Contextual Pill Button */}
+                        {permissions.canManageJobCards && (job.docStage === 'QUOTATION' || job.docStage === 'ESTIMATE') ? (
                           <Button
                             variant="outline"
                             size="sm"
                             onClick={() => handleConvertToJobCard(job)}
-                            className="h-7 px-2 text-[10px] font-bold text-blue-700 border-blue-300 hover:bg-blue-50 gap-1"
+                            className="h-7 px-2.5 text-xs font-medium rounded-md border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 inline-flex items-center gap-1 shadow-2xs whitespace-nowrap"
                             title="Convert to Job Card"
                             data-testid={`convert-job-btn-${job.id}`}
                           >
-                            <CheckCircle2 className="w-3 h-3 text-blue-600" />
-                            <span>Job Card</span>
+                            <span>→ Job Card</span>
                           </Button>
-                        )}
-
-                        {permissions.canManageJobCards && (job.docStage === 'JOB_CARD' || job.docStage === 'ESTIMATE') && (
+                        ) : permissions.canManageJobCards && job.docStage === 'JOB_CARD' ? (
                           <Button
                             variant="outline"
                             size="sm"
                             onClick={() => handleConvertToInvoice(job)}
-                            className="h-7 px-2 text-[10px] font-bold text-emerald-700 border-emerald-300 hover:bg-emerald-50 gap-1"
+                            className="h-7 px-2.5 text-xs font-medium rounded-md border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 inline-flex items-center gap-1 shadow-2xs whitespace-nowrap"
                             title="Convert to Invoice"
                             data-testid={`convert-invoice-btn-${job.id}`}
                           >
-                            <FileCheck className="w-3 h-3 text-emerald-600" />
-                            <span>Invoice</span>
+                            <span>→ Invoice</span>
                           </Button>
+                        ) : (
+                          <Link to={`/workshop/sheet/${job.id}`}>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-7 px-2.5 text-xs font-medium rounded-md border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 inline-flex items-center gap-1 shadow-2xs whitespace-nowrap"
+                            >
+                              <span>View Sheet</span>
+                            </Button>
+                          </Link>
                         )}
 
-                        {role !== 'TECHNICIAN' && (
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            onClick={() => setActivePaymentJob(job)}
-                            className="h-7 w-7 text-amber-700 border-amber-300 hover:bg-amber-50"
-                            title="Collect Payment"
-                            data-testid={`collect-payment-btn-${job.id}`}
+                        {/* 2. Three-Dot Dropdown Menu (⋯) */}
+                        <div className="relative inline-block text-left group/menu">
+                          <button
+                            type="button"
+                            onClick={() => setOpenMenuJobId(openMenuJobId === job.id ? null : job.id)}
+                            className="h-7 w-7 rounded-md border border-slate-200/80 bg-white hover:bg-slate-100 flex items-center justify-center text-slate-500 hover:text-slate-900 cursor-pointer transition-colors shadow-2xs"
+                            title="More actions"
+                            data-testid={`job-menu-trigger-${job.id}`}
                           >
-                            <CreditCard className="w-3.5 h-3.5 text-amber-600" />
-                          </Button>
-                        )}
+                            <MoreVertical className="w-3.5 h-3.5" />
+                          </button>
 
-                        <Link to={`/workshop/sheet/${job.id}`}>
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            className="h-7 w-7 text-slate-700 border-slate-300 hover:bg-slate-100"
-                            title="Open / Edit Repair Sheet"
-                            data-testid={`edit-job-btn-${job.id}`}
+                          <div
+                            className={cn(
+                              'absolute right-0 mt-1 w-44 rounded-xl bg-white border border-slate-200/90 shadow-lg py-1 z-30 transition-all text-xs text-left',
+                              openMenuJobId === job.id ? 'block' : 'hidden group-hover/menu:block'
+                            )}
                           >
-                            <ExternalLink className="w-3.5 h-3.5" />
-                          </Button>
-                        </Link>
+                            <Link
+                              to={`/workshop/sheet/${job.id}`}
+                              className="flex items-center gap-2 px-3 py-2 text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors w-full"
+                              data-testid={`edit-job-btn-${job.id}`}
+                              onClick={() => setOpenMenuJobId(null)}
+                            >
+                              <ExternalLink className="w-3.5 h-3.5 text-slate-400" />
+                              <span>View / Edit Sheet</span>
+                            </Link>
 
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          onClick={() => setActivePrintJob(job)}
-                          className="h-7 w-7 text-slate-700 border-slate-300 hover:bg-slate-100"
-                          title="Print A4 Estimate / Job Sheet"
-                          data-testid={`print-job-btn-${job.id}`}
-                        >
-                          <Printer className="w-3.5 h-3.5" />
-                        </Button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setActivePrintJob(job);
+                                setOpenMenuJobId(null);
+                              }}
+                              className="flex items-center gap-2 px-3 py-2 text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors w-full cursor-pointer text-left"
+                              data-testid={`print-job-btn-${job.id}`}
+                            >
+                              <Printer className="w-3.5 h-3.5 text-slate-400" />
+                              <span>Print A4</span>
+                            </button>
 
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          onClick={() => handleWhatsAppShare(job)}
-                          className="h-7 w-7 text-emerald-700 border-emerald-300 hover:bg-emerald-50"
-                          title="Share via WhatsApp"
-                          data-testid={`whatsapp-job-btn-${job.id}`}
-                        >
-                          <Share2 className="w-3.5 h-3.5" />
-                        </Button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                handleWhatsAppShare(job);
+                                setOpenMenuJobId(null);
+                              }}
+                              className="flex items-center gap-2 px-3 py-2 text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors w-full cursor-pointer text-left"
+                              data-testid={`whatsapp-job-btn-${job.id}`}
+                            >
+                              <Share2 className="w-3.5 h-3.5 text-emerald-600" />
+                              <span>Share WhatsApp</span>
+                            </button>
 
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDeleteJob(job.id, job.jobNumber)}
-                          className="h-7 w-7 text-slate-400 hover:text-red-600"
-                          title="Delete Job"
-                          data-testid={`delete-job-btn-${job.id}`}
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </Button>
+                            {role !== 'TECHNICIAN' && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setActivePaymentJob(job);
+                                  setOpenMenuJobId(null);
+                                }}
+                                className="flex items-center gap-2 px-3 py-2 text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors w-full cursor-pointer text-left"
+                                data-testid={`collect-payment-btn-${job.id}`}
+                              >
+                                <CreditCard className="w-3.5 h-3.5 text-amber-600" />
+                                <span>Record Payment</span>
+                              </button>
+                            )}
+
+                            {permissions.canManageJobCards && job.docStage === 'ESTIMATE' && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  handleConvertToInvoice(job);
+                                  setOpenMenuJobId(null);
+                                }}
+                                className="flex items-center gap-2 px-3 py-2 text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors w-full cursor-pointer text-left"
+                                data-testid={`convert-invoice-btn-${job.id}`}
+                              >
+                                <FileCheck className="w-3.5 h-3.5 text-emerald-600" />
+                                <span>Convert to Invoice</span>
+                              </button>
+                            )}
+
+                            {job.docStage === 'INVOICE' && (
+                              <Link
+                                to={`/workshop/invoice/${job.id}`}
+                                className="flex items-center gap-2 px-3 py-2 text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors w-full text-left"
+                                data-testid={`open-invoice-btn-${job.id}`}
+                                onClick={() => setOpenMenuJobId(null)}
+                              >
+                                <Receipt className="w-3.5 h-3.5 text-emerald-600" />
+                                <span>Invoice Terminal</span>
+                              </Link>
+                            )}
+
+                            <div className="border-t border-slate-100 my-1" />
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setOpenMenuJobId(null);
+                                handleDeleteJob(job.id, job.jobNumber);
+                              }}
+                              className="flex items-center gap-2 px-3 py-2 text-red-600 hover:bg-red-50 transition-colors w-full cursor-pointer text-left"
+                              data-testid={`delete-job-btn-${job.id}`}
+                            >
+                              <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                              <span>Delete Job</span>
+                            </button>
+                          </div>
+                        </div>
                       </div>
                     </td>
                   </tr>
@@ -567,6 +669,32 @@ export function WorkshopJobsPage() {
             </table>
           </div>
         )}
+
+        {/* Clean Pagination / Count Footer Bar */}
+        <div className="flex items-center justify-between px-5 py-3 border-t border-slate-200/70 bg-slate-50/30 text-xs text-slate-500">
+          <div>
+            Showing 1–{jobs.length} of {jobs.length} workshop records
+          </div>
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              disabled
+              className="px-2.5 py-1 text-xs font-medium rounded-md border border-slate-200/80 bg-white text-slate-400 cursor-not-allowed"
+            >
+              Previous
+            </button>
+            <span className="w-7 h-7 flex items-center justify-center bg-slate-900 text-white rounded-md font-sans tabular-nums font-semibold text-xs">
+              1
+            </span>
+            <button
+              type="button"
+              disabled
+              className="px-2.5 py-1 text-xs font-medium rounded-md border border-slate-200/80 bg-white text-slate-400 cursor-not-allowed"
+            >
+              Next
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* A4 Print Modal for quick preview from list */}
@@ -624,6 +752,6 @@ export function WorkshopJobsPage() {
           }}
         />
       )}
-    </div>
+    </PageContainer>
   );
 }

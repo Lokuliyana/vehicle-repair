@@ -24,7 +24,7 @@ interface AuthContextType {
   hasPermission: (permission: keyof RolePermissions) => boolean;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const STORAGE_KEY_ROLE = 'antigravity_user_role';
 const STORAGE_KEY_COST_MODE = 'antigravity_cost_mode_visible';

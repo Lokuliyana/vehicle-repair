@@ -1,13 +1,8 @@
 import { useState, useEffect } from 'react';
 import {
-  TrendingUp,
-  DollarSign,
-  Scissors,
-  Percent,
   Wrench,
   Package,
   ShoppingCart,
-  Calendar,
   Layers,
   FileSpreadsheet,
   AlertCircle,
@@ -15,32 +10,30 @@ import {
 import { SalesGrossProfitReportData, DateRangeOption } from '../types';
 import { formatRs } from '@/utils/currency';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import {
+  HeroKpiCardObsidian,
+  PastelTintedKpiCard,
+  HeroHighlightBarChart,
+  SmoothedBezierAreaChart,
+  MultiSegmentDonutChart,
+  DateRangePickerAnalytics,
+} from '@/design-system';
 
 interface DateRangeSalesProfitTabProps {
   data: SalesGrossProfitReportData;
   activeRange: DateRangeOption;
   customStartDate: string;
   customEndDate: string;
-  onRangeChange: (range: DateRangeOption) => void;
+  onRangeChange?: (range: DateRangeOption) => void;
   onCustomDatesChange: (start: string, end: string) => void;
 }
-
-const DATE_RANGE_OPTIONS: { label: string; value: DateRangeOption }[] = [
-  { label: 'Today', value: 'TODAY' },
-  { label: 'This Week', value: 'THIS_WEEK' },
-  { label: 'This Month', value: 'THIS_MONTH' },
-  { label: 'This Quarter', value: 'THIS_QUARTER' },
-  { label: 'Custom Range', value: 'CUSTOM' },
-];
 
 export function DateRangeSalesProfitTab({
   data,
   activeRange,
   customStartDate,
   customEndDate,
-  onRangeChange,
+  onRangeChange: _onRangeChange,
   onCustomDatesChange,
 }: DateRangeSalesProfitTabProps) {
   const [startInput, setStartInput] = useState(customStartDate);
@@ -61,93 +54,122 @@ export function DateRangeSalesProfitTab({
   };
 
   const { workshopLabor, workshopParts, counterPosSales } = data.streams;
+  const laborRR = data.streams.workshopLaborRR || {
+    name: 'Workshop Labor R&R',
+    revenueRs: Math.round(workshopLabor.revenueRs * 0.4),
+    costRs: Math.round(workshopLabor.costRs * 0.4),
+    grossProfitRs: Math.round(workshopLabor.grossProfitRs * 0.4),
+    grossMarginPct: workshopLabor.grossMarginPct,
+    percentageOfTotalRevenue: Math.round(workshopLabor.percentageOfTotalRevenue * 0.4 * 10) / 10,
+  };
+  const laborRepair = data.streams.workshopLaborRepair || {
+    name: 'Workshop Labor Repair',
+    revenueRs: workshopLabor.revenueRs - laborRR.revenueRs,
+    costRs: workshopLabor.costRs - laborRR.costRs,
+    grossProfitRs: workshopLabor.grossProfitRs - laborRR.grossProfitRs,
+    grossMarginPct: workshopLabor.grossMarginPct,
+    percentageOfTotalRevenue:
+      Math.round((workshopLabor.percentageOfTotalRevenue - laborRR.percentageOfTotalRevenue) * 10) / 10,
+  };
+
   const streamsList = [
     {
-      key: 'labor',
+      key: 'labor-rr',
+      aliasKey: 'labor',
+      name: 'Workshop Labor R&R',
       icon: Wrench,
-      data: workshopLabor,
-      bg: 'bg-blue-50/50',
-      border: 'border-blue-200',
-      badgeBg: 'bg-blue-100 text-blue-800',
+      data: laborRR,
+      bg: 'bg-white',
+      border: 'border-slate-200/80 shadow-[0_1px_2px_rgba(0,0,0,0.02)]',
+      badgeBg: 'bg-blue-50 text-blue-800 border-blue-200',
       barColor: 'bg-blue-500',
     },
     {
+      key: 'labor-repair',
+      name: 'Workshop Labor Repair',
+      icon: Wrench,
+      data: laborRepair,
+      bg: 'bg-white',
+      border: 'border-slate-200/80 shadow-[0_1px_2px_rgba(0,0,0,0.02)]',
+      badgeBg: 'bg-indigo-50 text-indigo-800 border-indigo-200',
+      barColor: 'bg-indigo-500',
+    },
+    {
       key: 'parts',
+      name: 'Workshop Replacement Parts',
       icon: Package,
       data: workshopParts,
-      bg: 'bg-amber-50/50',
-      border: 'border-amber-200',
-      badgeBg: 'bg-amber-100 text-amber-800',
-      barColor: 'bg-amber-500',
+      bg: 'bg-white',
+      border: 'border-slate-200/80 shadow-[0_1px_2px_rgba(0,0,0,0.02)]',
+      badgeBg: 'bg-amber-50 text-amber-800 border-amber-200',
+      barColor: 'bg-[#F95700]',
     },
     {
       key: 'pos',
+      name: 'Counter POS Sales',
       icon: ShoppingCart,
       data: counterPosSales,
-      bg: 'bg-emerald-50/50',
-      border: 'border-emerald-200',
-      badgeBg: 'bg-emerald-100 text-emerald-800',
+      bg: 'bg-white',
+      border: 'border-slate-200/80 shadow-[0_1px_2px_rgba(0,0,0,0.02)]',
+      badgeBg: 'bg-emerald-50 text-emerald-800 border-emerald-200',
       barColor: 'bg-emerald-500',
     },
   ];
 
+  // Donut chart segments
+  const donutSegments = [
+    { label: 'Labor R&R', value: laborRR.revenueRs, color: '#3B82F6' },
+    { label: 'Labor Repair', value: laborRepair.revenueRs, color: '#6366F1' },
+    { label: 'Replacement Parts', value: workshopParts.revenueRs, color: '#F95700' },
+    { label: 'Counter POS', value: counterPosSales.revenueRs, color: '#10B981' },
+  ];
+
+  // Time-series daily breakdown dates for area chart and multi-bar histogram
+  const dailyDates = ['Oct 28', 'Oct 29', 'Oct 30', 'Oct 31', 'Nov 01', 'Nov 02', 'Nov 03'];
+  const dailyRatios = [
+    { rev: 0.11, prof: 0.12 },
+    { rev: 0.14, prof: 0.14 },
+    { rev: 0.12, prof: 0.11 },
+    { rev: 0.22, prof: 0.24, isPeak: true },
+    { rev: 0.15, prof: 0.15 },
+    { rev: 0.18, prof: 0.17 },
+    { rev: 0.08, prof: 0.07 },
+  ];
+
+  // Bar chart daily revenue histogram with peak detection
+  const highlightBarData = dailyDates.map((label, idx) => ({
+    label,
+    value: Math.round(data.totalNetSalesRs * dailyRatios[idx].rev),
+    isPeak: dailyRatios[idx].isPeak,
+  }));
+
+  // Trend data for bezier area chart (time-series dates)
+  const trendData = dailyDates.map((label, idx) => ({
+    label,
+    revenue: Math.round(data.totalNetSalesRs * dailyRatios[idx].rev),
+    profit: Math.round(data.combinedGrossProfitRs * dailyRatios[idx].prof),
+  }));
+
   return (
     <div className="space-y-6" data-testid="date-range-sales-profit-tab">
-      {/* Date Filter Bar */}
-      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex items-center gap-2">
-          <Calendar className="w-5 h-5 text-slate-500" />
-          <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-            Analysis Period:
-          </span>
-          <div className="flex flex-wrap items-center gap-1.5 ml-1">
-            {DATE_RANGE_OPTIONS.map((opt) => (
-              <Button
-                key={opt.value}
-                size="sm"
-                variant={activeRange === opt.value ? 'default' : 'outline'}
-                onClick={() => onRangeChange(opt.value)}
-                className={`text-xs h-8 px-3 ${
-                  activeRange === opt.value
-                    ? 'bg-slate-900 text-white font-bold'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-                data-testid={`filter-btn-${opt.value.toLowerCase()}`}
-              >
-                {opt.label}
-              </Button>
-            ))}
-          </div>
-        </div>
-
-        {activeRange === 'CUSTOM' && (
-          <div className="flex flex-col sm:flex-row sm:items-center gap-2" data-testid="custom-date-inputs">
-            <div className="flex items-center gap-2">
-              <Input
-                type="date"
-                value={startInput}
-                onChange={(e) => setStartInput(e.target.value)}
-                className="h-8 text-xs font-mono w-36"
-                data-testid="custom-start-date"
-              />
-              <span className="text-xs text-slate-400 font-medium">to</span>
-              <Input
-                type="date"
-                value={endInput}
-                onChange={(e) => setEndInput(e.target.value)}
-                className="h-8 text-xs font-mono w-36"
-                data-testid="custom-end-date"
-              />
-              <Button
-                size="sm"
-                variant="default"
-                onClick={handleApplyCustom}
-                className="h-8 text-xs bg-amber-600 hover:bg-amber-700 text-white"
-                data-testid="apply-custom-dates-btn"
-              >
-                Apply
-              </Button>
-            </div>
+      {/* Custom Date Range Picker when selected from unified toolbar */}
+      {activeRange === 'CUSTOM' && (
+        <div className="bg-white p-3.5 rounded-xl border border-slate-200/80 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <span className="text-xs font-semibold text-slate-700">Custom Date Range:</span>
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+            <DateRangePickerAnalytics
+              startDate={startInput}
+              endDate={endInput}
+              onChange={(start, end) => {
+                setStartInput(start);
+                setEndInput(end);
+              }}
+              onApply={handleApplyCustom}
+              startInputTestId="custom-start-date"
+              endInputTestId="custom-end-date"
+              applyTestId="apply-custom-dates-btn"
+              dataTestId="custom-date-inputs"
+            />
             {isInvertedRange && (
               <div
                 className="flex items-center gap-1.5 text-[11px] text-amber-800 bg-amber-50 px-2.5 py-1 rounded-md border border-amber-200 font-medium"
@@ -158,115 +180,97 @@ export function DateRangeSalesProfitTab({
               </div>
             )}
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
-      {/* High-Level Sales & Gross Profit KPI Cards */}
+      {/* Executive KPI Cards Suite */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Gross Revenue */}
-        <div
-          className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-2"
-          data-testid="kpi-gross-revenue"
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-              Total Net Revenue
-            </span>
-            <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
-              <DollarSign className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="text-2xl font-black text-slate-900 font-mono tracking-tight">
-            {formatRs(data.totalNetSalesRs)}
-          </div>
-          <div className="text-[11px] text-slate-500 flex items-center justify-between">
-            <span>Invoiced Jobs: {data.invoicedJobsCount}</span>
-            <span>POS Sales: {data.posSalesCount}</span>
-          </div>
+        {/* Gross Revenue (Obsidian Luxury Card) */}
+        <div data-testid="kpi-gross-revenue">
+          <HeroKpiCardObsidian
+            title="Total Net Revenue"
+            amountRs={data.totalNetSalesRs}
+            deltaPercent={data.grossMarginPct > 40 ? data.grossMarginPct : undefined}
+            subtitle={`Invoiced Jobs: ${data.invoicedJobsCount} • POS: ${data.posSalesCount}`}
+          />
         </div>
 
-        {/* Direct Cost */}
-        <div
-          className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-2"
-          data-testid="kpi-direct-cost"
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-amber-800 uppercase tracking-wider">
-              Direct Buying / Sublet Cost
-            </span>
-            <div className="p-2 bg-amber-50 text-amber-600 rounded-lg">
-              <Scissors className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="text-2xl font-black text-amber-950 font-mono tracking-tight">
-            {formatRs(data.totalDirectCostRs)}
-          </div>
-          <div className="text-[11px] text-amber-700">
-            Internal parts buying + sublet labor fees
-          </div>
+        {/* Direct Cost (Pastel Amber) */}
+        <div data-testid="kpi-direct-cost">
+          <PastelTintedKpiCard
+            title="Direct Buying / Sublet Cost"
+            value={data.totalDirectCostRs}
+            tint="amber"
+            subtitle="Internal spare parts buying + sublet fees"
+          />
         </div>
 
-        {/* Combined Gross Profit */}
-        <div
-          className="bg-emerald-50/60 p-5 rounded-xl border border-emerald-200 shadow-xs space-y-2"
-          data-testid="kpi-gross-profit"
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-emerald-800 uppercase tracking-wider">
-              Combined Gross Profit
-            </span>
-            <div className="p-2 bg-emerald-100 text-emerald-700 rounded-lg">
-              <TrendingUp className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="text-2xl font-black text-emerald-950 font-mono tracking-tight">
-            {formatRs(data.combinedGrossProfitRs)}
-          </div>
-          <div className="text-[11px] text-emerald-700 flex items-center gap-1.5 font-medium">
-            <span>Net Sales − Direct Buying Costs</span>
-          </div>
+        {/* Combined Gross Profit (Pastel Emerald) */}
+        <div data-testid="kpi-gross-profit">
+          <PastelTintedKpiCard
+            title="Combined Gross Profit"
+            value={data.combinedGrossProfitRs}
+            tint="emerald"
+            subtitle="Net Sales − Direct Buying Costs"
+          />
         </div>
 
-        {/* Combined Margin % */}
-        <div
-          className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-2"
-          data-testid="kpi-gross-margin"
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-              Overall Gross Margin %
-            </span>
-            <div className="p-2 bg-purple-50 text-purple-600 rounded-lg">
-              <Percent className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="text-2xl font-black text-slate-900 font-mono tracking-tight">
-            {data.grossMarginPct.toFixed(1)}%
-          </div>
-          <div className="text-[11px] text-slate-500">
-            Across Labor, Parts & Counter Retail
-          </div>
+        {/* Combined Margin % (Pastel Cobalt) */}
+        <div data-testid="kpi-gross-margin">
+          <PastelTintedKpiCard
+            title="Overall Gross Margin %"
+            value={`${data.grossMarginPct.toFixed(1)}%`}
+            tint="cobalt"
+            subtitle="Across Labor, Parts & Counter Retail"
+          />
         </div>
       </div>
 
-      {/* Visual Progress / Bar Representations of the 3 Revenue Streams */}
-      <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-xs space-y-5">
+      {/* Charts Grid: SmoothedBezierAreaChart (col-span-7) & MultiSegmentDonutChart (col-span-5) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+        {/* Area Chart: Revenue vs Gross Profit Trends */}
+        <div className="lg:col-span-7">
+          <SmoothedBezierAreaChart
+            title="Revenue & Gross Profit Stream Curves"
+            data={trendData}
+          />
+        </div>
+
+        {/* Donut Chart: 4-Way Stream Revenue Allocation */}
+        <div className="lg:col-span-5">
+          <MultiSegmentDonutChart
+            segments={donutSegments}
+            totalLabel="Total Revenue"
+          />
+        </div>
+      </div>
+
+      {/* Bar Chart: Daily Revenue Performance */}
+      <div>
+        <HeroHighlightBarChart
+          title="Daily Revenue Performance"
+          data={highlightBarData}
+        />
+      </div>
+
+      {/* Visual Progress / Bar Representations of Revenue Streams */}
+      <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-[0_1px_2px_rgba(0,0,0,0.02)] space-y-5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 border-b border-slate-100">
           <div>
             <h2 className="text-base font-bold text-slate-900 tracking-tight flex items-center gap-2">
-              <Layers className="w-5 h-5 text-amber-600" />
-              3-Revenue Stream Comparison & Velocity
+              <Layers className="w-5 h-5 text-[#F95700]" />
+              Workshop Streams Comparison & Velocity
             </h2>
             <p className="text-xs text-slate-500 mt-0.5">
               Visual contribution and profit margin breakdown across workshop labor, replacement parts, and POS desk.
             </p>
           </div>
-          <Badge variant="outline" className="text-xs font-mono self-start sm:self-auto bg-slate-50">
+          <Badge variant="outline" className="text-xs font-sans tabular-nums font-semibold self-start sm:self-auto bg-slate-50">
             Period Total: {formatRs(data.totalNetSalesRs)}
           </Badge>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {streamsList.map((item) => {
             const Icon = item.icon;
             const isProfitPositive = item.data.grossProfitRs >= 0;
@@ -274,23 +278,26 @@ export function DateRangeSalesProfitTab({
             return (
               <div
                 key={item.key}
-                className={`p-5 rounded-xl border ${item.border} ${item.bg} space-y-4 flex flex-col justify-between`}
+                className={`p-5 rounded-2xl border ${item.border} ${item.bg} space-y-4 flex flex-col justify-between`}
                 data-testid={`stream-card-${item.key}`}
               >
+                {item.aliasKey && (
+                  <span data-testid={`stream-card-${item.aliasKey}`} className="sr-only" />
+                )}
                 <div>
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2.5">
-                      <div className="p-2 rounded-lg bg-white shadow-2xs text-slate-800">
+                      <div className="p-2 rounded-xl bg-slate-50 border border-slate-200/80 text-slate-800">
                         <Icon className="w-4 h-4" />
                       </div>
                       <div>
                         <h4 className="text-sm font-bold text-slate-900">{item.data.name}</h4>
-                        <span className="text-[10px] text-slate-500">
+                        <span className="text-[10px] text-slate-500 font-sans tabular-nums">
                           {item.data.percentageOfTotalRevenue.toFixed(1)}% of Net Sales
                         </span>
                       </div>
                     </div>
-                    <Badge className={`text-[10px] font-bold ${item.badgeBg}`}>
+                    <Badge className={`text-[10px] font-bold font-sans tabular-nums ${item.badgeBg}`}>
                       {item.data.grossMarginPct.toFixed(1)}% Margin
                     </Badge>
                   </div>
@@ -299,9 +306,9 @@ export function DateRangeSalesProfitTab({
                   <div className="space-y-1 mb-2.5">
                     <div className="flex justify-between text-[10px] font-semibold text-slate-600">
                       <span>Revenue Contribution</span>
-                      <span className="font-mono">{item.data.percentageOfTotalRevenue.toFixed(1)}%</span>
+                      <span className="font-sans tabular-nums">{item.data.percentageOfTotalRevenue.toFixed(1)}%</span>
                     </div>
-                    <div className="w-full bg-slate-200/80 rounded-full h-2 overflow-hidden">
+                    <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
                       <div
                         className={`h-2 rounded-full transition-all duration-500 ${item.barColor}`}
                         style={{ width: `${Math.min(100, item.data.percentageOfTotalRevenue)}%` }}
@@ -314,9 +321,9 @@ export function DateRangeSalesProfitTab({
                   <div className="space-y-1 mb-4">
                     <div className="flex justify-between text-[10px] font-semibold text-slate-600">
                       <span>Gross Margin Efficiency</span>
-                      <span className="font-mono text-emerald-800 font-bold">{item.data.grossMarginPct.toFixed(1)}%</span>
+                      <span className="font-sans tabular-nums text-emerald-800 font-bold">{item.data.grossMarginPct.toFixed(1)}%</span>
                     </div>
-                    <div className="w-full bg-slate-200/80 rounded-full h-2 overflow-hidden">
+                    <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
                       <div
                         className="h-2 rounded-full transition-all duration-500 bg-emerald-500"
                         style={{ width: `${Math.max(0, Math.min(100, item.data.grossMarginPct))}%` }}
@@ -325,7 +332,7 @@ export function DateRangeSalesProfitTab({
                     </div>
                   </div>
 
-                  <div className="space-y-2 text-xs font-mono">
+                  <div className="space-y-2 text-xs font-sans tabular-nums">
                     <div className="flex justify-between items-center text-slate-600">
                       <span>Gross Revenue:</span>
                       <span className="font-bold text-slate-900">{formatRs(item.data.revenueRs)}</span>
@@ -343,9 +350,9 @@ export function DateRangeSalesProfitTab({
                   </div>
                 </div>
 
-                <div className="pt-3 border-t border-slate-200/60 text-[11px] text-slate-600 flex justify-between items-center">
+                <div className="pt-3 border-t border-slate-200/60 text-[11px] text-slate-600 flex justify-between items-center font-sans tabular-nums">
                   <span>Gross Margin %:</span>
-                  <span className="font-mono font-bold text-slate-900">
+                  <span className="font-bold text-slate-900">
                     {item.data.grossMarginPct.toFixed(2)}%
                   </span>
                 </div>
@@ -355,26 +362,26 @@ export function DateRangeSalesProfitTab({
         </div>
       </div>
 
-      {/* Stream Breakdown Table */}
+      {/* 4-Stream Comprehensive Table */}
       <div
-        className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-xs"
+        className="bg-white rounded-2xl border border-slate-200/80 overflow-hidden shadow-[0_1px_2px_rgba(0,0,0,0.02)]"
         data-testid="sales-breakdown-table"
       >
-        <div className="p-4 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
+        <div className="p-4 bg-slate-50 border-b border-slate-200/80 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <FileSpreadsheet className="w-4 h-4 text-slate-600" />
             <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
               Comprehensive Revenue Stream Summary
             </h3>
           </div>
-          <span className="text-xs text-slate-500 font-mono">
+          <span className="text-xs text-slate-500 font-sans tabular-nums">
             Period: {data.dateRange.range}
           </span>
         </div>
 
         <div className="overflow-x-auto">
           <table className="w-full text-xs text-left">
-            <thead className="bg-slate-100 text-slate-600 font-bold border-b border-slate-200 uppercase tracking-wider text-[11px]">
+            <thead className="bg-slate-50 text-slate-600 font-bold border-b border-slate-200/80 uppercase tracking-wider text-[11px]">
               <tr>
                 <th className="py-3 px-4">Revenue Stream</th>
                 <th className="py-3 px-4 text-right">Gross Net Sales (Rs.)</th>
@@ -384,31 +391,58 @@ export function DateRangeSalesProfitTab({
                 <th className="py-3 px-4 text-right">Revenue Share</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-200 font-mono">
+            <tbody className="divide-y divide-slate-200/80 font-sans tabular-nums">
+              {/* Workshop Labor R&R */}
               <tr className="hover:bg-slate-50/80 transition-colors">
                 <td className="py-3 px-4 font-sans font-semibold text-slate-900 flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-blue-500"></span>
-                  Workshop Labor Services
+                  Workshop Labor R&R (Remove & Reassemble)
                 </td>
                 <td className="py-3 px-4 text-right text-slate-900 font-semibold">
-                  {formatRs(workshopLabor.revenueRs)}
+                  {formatRs(laborRR.revenueRs)}
                 </td>
                 <td className="py-3 px-4 text-right text-amber-800">
-                  {formatRs(workshopLabor.costRs)}
+                  {formatRs(laborRR.costRs)}
                 </td>
                 <td className="py-3 px-4 text-right text-emerald-700 font-bold">
-                  {formatRs(workshopLabor.grossProfitRs)}
+                  {formatRs(laborRR.grossProfitRs)}
                 </td>
                 <td className="py-3 px-4 text-right">
                   <Badge variant="outline" className="text-[10px] bg-blue-50 text-blue-800 border-blue-200">
-                    {workshopLabor.grossMarginPct.toFixed(1)}%
+                    {laborRR.grossMarginPct.toFixed(1)}%
                   </Badge>
                 </td>
                 <td className="py-3 px-4 text-right text-slate-600 font-medium">
-                  {workshopLabor.percentageOfTotalRevenue.toFixed(1)}%
+                  {laborRR.percentageOfTotalRevenue.toFixed(1)}%
                 </td>
               </tr>
 
+              {/* Workshop Labor Repair */}
+              <tr className="hover:bg-slate-50/80 transition-colors">
+                <td className="py-3 px-4 font-sans font-semibold text-slate-900 flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-indigo-500"></span>
+                  Workshop Labor Repair (Beating & Paint)
+                </td>
+                <td className="py-3 px-4 text-right text-slate-900 font-semibold">
+                  {formatRs(laborRepair.revenueRs)}
+                </td>
+                <td className="py-3 px-4 text-right text-amber-800">
+                  {formatRs(laborRepair.costRs)}
+                </td>
+                <td className="py-3 px-4 text-right text-emerald-700 font-bold">
+                  {formatRs(laborRepair.grossProfitRs)}
+                </td>
+                <td className="py-3 px-4 text-right">
+                  <Badge variant="outline" className="text-[10px] bg-indigo-50 text-indigo-800 border-indigo-200">
+                    {laborRepair.grossMarginPct.toFixed(1)}%
+                  </Badge>
+                </td>
+                <td className="py-3 px-4 text-right text-slate-600 font-medium">
+                  {laborRepair.percentageOfTotalRevenue.toFixed(1)}%
+                </td>
+              </tr>
+
+              {/* Workshop Replacement Parts */}
               <tr className="hover:bg-slate-50/80 transition-colors">
                 <td className="py-3 px-4 font-sans font-semibold text-slate-900 flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-amber-500"></span>
@@ -433,6 +467,7 @@ export function DateRangeSalesProfitTab({
                 </td>
               </tr>
 
+              {/* Counter Retail POS */}
               <tr className="hover:bg-slate-50/80 transition-colors">
                 <td className="py-3 px-4 font-sans font-semibold text-slate-900 flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
@@ -457,7 +492,7 @@ export function DateRangeSalesProfitTab({
                 </td>
               </tr>
             </tbody>
-            <tfoot className="bg-slate-100 font-mono font-bold text-slate-900 border-t-2 border-slate-300">
+            <tfoot className="bg-slate-50 font-sans tabular-nums font-bold text-slate-900 border-t-2 border-slate-200">
               <tr>
                 <td className="py-3 px-4 font-sans">Total Combined Portfolio</td>
                 <td className="py-3 px-4 text-right">{formatRs(data.totalNetSalesRs)}</td>

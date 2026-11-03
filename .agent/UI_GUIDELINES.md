@@ -1,49 +1,77 @@
 # UI, Print & Ergonomic Guidelines (UI_GUIDELINES.md)
+## 500 Labs — Antigravity Workshop & POS Master System
 
-## 1. Visual Aesthetics & Design System
-- **Tone:** Professional, high-contrast, modern industrial workshop utility.
-- **Palette:** Deep slate backgrounds and borders (`slate-900`, `slate-700`, `slate-200`), clean white work surfaces, vibrant functional accents (emerald for completed/approved, amber for pending/margins, sky for quotations, rose for alerts).
-- **Typography:** Clear tabular sans fonts (`Inter`, `system-ui`) with monospace digits (`font-mono tabular-nums`) for currency figures and serial codes.
-- **Component Primitives:** Built on shadcn/ui patterns (Radix UI accessible primitives + Tailwind utility classes).
+---
 
-## 2. Workshop Sheet Ergonomics
-- **Dense Editable Tables:** Compact row heights (`py-1.5 px-2`) to allow viewing all three repair categories simultaneously without tiring vertical scroll.
-- **Continuous Enter-to-Add Navigation:**
-  - Pressing `Enter` on the `Amount (Rs.)` field of any line item immediately appends a new blank row under the same category and focuses its `Description` input.
-  - Up / Down arrow navigation between table cells for rapid quote generation.
-- **Cost & Profit Highlight Mode:**
-  - When the Owner/Manager toggles *Cost & Profit Mode*, the `Buying Cost (Rs.)` and `Margin (Rs.)` columns appear with a subtle amber/zinc background tint (`bg-amber-50/50 dark:bg-amber-950/20`) and a lock icon header.
-  - When toggled off or viewed by Cashiers/Technicians, the internal cost columns are completely removed from the DOM.
+## 1. Global Visual Hierarchy & Aesthetic Mechanics
 
-## 3. A4 Workshop Print Layout (`@media print`)
-- **Page Dimensions:** Standard A4 Portrait (`210mm x 297mm`) with `12mm` margins.
-- **Header Fidelity:**
-  - Workshop Banner: Top centered bold banner:
-    *"ALL KIND OF VEHICLE, ELECTRICAL & MECHANICAL REPAIRS, SCANNING, TINKERING, ACCIDENT REPAIR & AUTO PAINT"*
-  - Document Title: Dynamic uppercase title (`ACCIDENT REPAIR QUOTATION`, `ACCIDENT REPAIR ESTIMATE`, `WORKSHOP JOB CARD`, or `FINAL INVOICE`).
-  - 12-Field Grid: Sharp `1px solid #1e293b` borders, high-contrast labels, and bold field values.
-- **Table Formatting:**
-  - Crisp bordered tables matching the uploaded docx templates.
-  - Category titles with uppercase headers:
-    1. `LABOR - REMOVE & REASSEMBLE`
-    2. `LABOR - REPAIR`
-    3. `REPLACEMENT`
-- **Floor Sheet Mode (Job Card):**
-  - All currency columns (`Amount Rs.`) and monetary subtotals are replaced with `Assigned Tech` and `Completed [ ]` checklist boxes.
-- **Footer:**
-  - Disclaimer: *"Computer generated estimate and does not carry a signature."*
-  - Bottom Sign-off: *"T H A N K   Y O U"*
-- **Strict Privacy Invariant:**
-  - `print:hidden` on all screen toolbars, navigation buttons, tabs, and cost/margin elements.
+1. **Color System & Global Management:**
+   - Managed centrally via `src/design-system/tokens.ts` and `src/design-system/global-manager.ts`.
+   - **Canvas Background:** Atmospheric Cool Chalk (`#F6F8FA`) or Warm Porcelain (`#F9F8F6`).
+   - **Surface Elevation:** Crisp White (`#FFFFFF`) with `1px solid rgba(15, 23, 42, 0.08)` micro-hairline borders and ambient multi-layered shadows (`0 2px 10px -2px rgba(15, 23, 42, 0.03), 0 12px 32px -4px rgba(15, 23, 42, 0.02)`).
+   - **Brand Terracotta (`#F95700` / `#EA580C`):** Reserved exclusively for primary conversion CTAs, active filters, and peak histogram bars.
+   - **Obsidian Anchor (`#0F172A`):** Dark hero KPI cards, stage transitions (`Convert to Job Card`), and executive controls.
+   - **Tonal Semantic Pastels:**
+     - *Emerald:* `#ECFDF5` bg, `#A7F3D0` border, `#047857` text (Paid, Completed, Optimal Margin > 35%).
+     - *Amber:* `#FFFBEB` bg, `#FDE68A` border, `#B45309` text (Waiting Parts, Pending Insurance, Moderate Margin 20–35%).
+     - *Cobalt:* `#EFF6FF` bg, `#BFDBFE` border, `#1D4ED8` text (Active Bay, In Progress, Quotation).
+     - *Crimson:* `#FEF2F2` bg, `#FECACA` border, `#B91C1C` text (Cancelled, Overdue, Margin Loss < 0%).
 
-## 4. 80mm POS Thermal Receipt Layout
-- **Dimensions:** Fixed `80mm` width container (`~302px`), formatted for thermal receipt rolls (ESC/POS compatible).
-- **Content Flow:**
-  - Centered Workshop Name, Address, and Phone.
-  - Receipt #, Date & Time, Cashier Name.
-  - Customer / Vehicle reference note.
-  - Dashed horizontal divider (`--------------------------------`).
-  - Itemized lines: `Item Description`, `Qty x Unit Price`, `Total Amount`.
-  - Subtotal, Discounts, Net Total.
-  - Payment Method, Amount Tendered, Change Due.
-  - Footer: Barcode representation and greeting.
+2. **Corner Radii & Concentricity:**
+   - Controls (buttons, inputs): `10px` (`rounded-control`).
+   - Cards, tables, repair sections: `16px` (`rounded-card`).
+   - Modals, drawers: `22px` (`rounded-modal`).
+   - Status badges & hotkeys: `9999px` (`rounded-full`).
+   - Concentric nested formula: $\text{Inner} = \max(0, \text{Outer} - \text{Padding})$.
+
+3. **Typography & Tabular Numerals:**
+   - Headings & Labels: Plus Jakarta Sans / Inter Display with proportional negative letter-spacing (`-0.015em`).
+   - Financial & Technical Data: Enforce `tabular-nums` and monospace digits (`JetBrains Mono`) for all license plates (`CBA-1234`), chassis numbers, currency values (`Rs. 145,000.00`), and margin percentages.
+
+---
+
+## 2. Screen & Form Ergonomics
+
+1. **Dense Line Tables:**
+   - Row padding calibrated to `py-1.5 px-2` to fit all 3 repair sections on standard workshop laptop/tablet viewports without excessive vertical scrolling.
+   - Warm Sand (`#FFF7ED`) or Cool Slate (`#F8FAFC`) column header row.
+
+2. **Hands-on-Keyboard Flow:**
+   - Pressing `Enter` on `Amount (Rs.)` appends a new blank row in `<16ms` with auto-focus on `Description`.
+   - `Tab` moves across cells sequentially.
+   - `⌘K` activates universal omni-search for license plates, job numbers, SKUs, and customers.
+
+3. **Admin Margin Mode:**
+   - Subtle emerald tint (`bg-emerald-50/70`) with lock glyph for internal `Buying Cost (Rs.)` and `Margin %` columns.
+   - Completely unmounted from DOM for Cashier, Service Advisor, and Technician roles.
+
+---
+
+## 3. A4 Workshop Document Print Calibration (`@media print`)
+
+1. **Physical Layout:**
+   - A4 Portrait (`210mm × 297mm`) with `10mm` margins.
+   - Zero application chrome: navigation rail, top header, status buttons, and admin cost columns carry `print:hidden`.
+
+2. **Document Structure Fidelity:**
+   - Service Banner: Top centered bold bar:
+     `MECHANICAL | ELECTRICAL | SCANNING | TINKERING | AUTO PAINT | SPARE PARTS`
+   - Document Title: Dynamic uppercase title framed in 2px black border (`ACCIDENT REPAIR QUOTATION`, `ACCIDENT REPAIR ESTIMATE`, `WORKSHOP JOB CARD`, `FINAL INVOICE`).
+   - 12-Field Matrix: Sharp `1px solid #000` borders matching the source Word template.
+   - 3-Section Tables: High-contrast bordered rows with independent 1..N numbering and subtotals.
+   - Mandatory Footer: *"This is a computer generated document and does not carry a physical signature."* followed by *"T H A N K   Y O U"*.
+
+3. **Floor Job Card Redaction:**
+   - When printing `JOB_CARD`, all `Amount (Rs.)` and monetary sum columns are stripped and replaced with `Assigned Tech` and `Completed [ ]` sign-off checkboxes.
+
+---
+
+## 4. 80mm POS Thermal Receipt Calibration
+
+1. **Dimensions & Flow:**
+   - Fixed `80mm` width container (`~302px`), monospace font (`9pt–10pt`), high-contrast black/white.
+   - Header: Workshop Name, Maharagama Branch Address, Hotline, Receipt #, Date/Time, Cashier Name.
+   - Dashed horizontal dividers (`--------------------------------`).
+   - Itemized lines: `Item Description`, `Qty × Unit Price = Line Total`.
+   - Totals: Subtotal, Discounts, Net Total, Cash Tendered, Change Due.
+   - Footer: Thermal barcode representation and greeting.

@@ -1,35 +1,69 @@
 # Phase Workflow & Completion Gate Protocol (WORKFLOW.md)
+## 500 Labs — Antigravity Workshop & POS Master System
 
-## 1. Execution Sequence Overview
-To guarantee modular stability, testability, and zero regression, the system is executed phase-by-phase across 11 structured phases:
+---
 
-- **Phase 0: Analysis & Planning**
-  Repository audit, `.agent/` architecture setup, domain modeling, requirements traceability matrix, and open questions resolution.
-- **Phase 1: Design System & Print Abstractions**
-  Project initialization (Vite, React, TS, Tailwind, shadcn primitives), color palette, high-contrast editable workshop tables, A4 print wrapper, and 80mm thermal receipt container.
-- **Phase 2: App Shell & Role Permissions**
-  Centralized routing, navigation sidebar/topbar, quick action shortcuts, Auth & Role context (`OWNER`, `WORKSHOP_MANAGER`, `SERVICE_ADVISOR`, `CASHIER`, `TECHNICIAN`), and cost/margin permission guard.
-- **Phase 3: Parts & Labor Catalog + Vehicle History Lookup**
-  Unified Parts & Labor catalog with SKU/barcode, Selling Price, and Buying Cost. Non-blocking Vehicle Number lookup helper auto-filling specs from previous jobs while remaining 100% editable.
-- **Phase 4: Workshop Quotations & Accident Repair Estimates**
-  Unified Repair Sheet (`/workshop/sheet`) with the exact 12-field header, 3 dynamic line-item tables, live subtotals, Admin Buying Cost & Gross Profit mode toggle, exact A4 template print view, and WhatsApp share link builder.
-- **Phase 5: Job Card Conversion & Workshop Floor Board**
-  One-click conversion from Quotation/Estimate to Job Card, immutable snapshot of original estimate amounts, price-redacted Job Card printout with technician assignment and checkboxes, and Kanban Workshop Status Board (`/workshop/board`).
-- **Phase 6: Workshop Invoicing, Split Billing & Collections**
-  One-click conversion to Invoice, supplementary line items, Discounts, Taxes, Advance Payments, Insurance Approved vs. Customer Excess split billing, Balance Due tracking, payment collection dialog, and invoice printout.
-- **Phase 7: Counter / Showroom POS & Shift Cash Management**
-  Dedicated Counter POS interface (`/pos`) for walk-in spare parts, lubricants, and quick services. Barcode/catalog search, custom item entry, cart math with hidden buying costs, tender modal (cash/card/transfer/split), 80mm thermal receipt, POS shift open/close, and petty-cash expense payouts.
-- **Phase 8: Embedded Finance, Sales, Cost & Gross Profit Center**
-  Unified Financial & Gross Profit ledger (`/finance/profit-ledger`) combining Workshop Invoices and POS Sales. Daily Shop Expense logging, real-time calculation of Gross Sales, Parts Cost, Labor Revenue, Gross Profit, Margin %, and Pending Insurance/Customer Receivables.
-- **Phase 9: Reports & Analytics Dashboards**
-  Date-Range Sales & Gross Profit Report (Workshop Labor vs. Replacements vs. Counter POS), Pending Insurance Claim Aging Report, Technician Turnaround Report, and Fast-Moving Parts / Low-Stock Alert Report.
-- **Phase 10: Full QA, Print Audit & Integration Readiness**
-  End-to-end workflow verification, comprehensive print-privacy leak audit, keyboard navigation validation, regression test suite, and NestJS/PostgreSQL API contract verification.
+## 1. UI Transformation Master Roadmap (Phases 0 to 10)
+
+To guarantee uncompromising luxury UI standards, modular stability, pixel fidelity, and zero regression, the UI transformation roadmap is executed across 11 structured phases:
+
+- **Phase 0: Codebase UI Audit, Governance & CSS Reset Foundation**
+  - Verify and organize all `.agent/` governance files (`AGENT.md`, `WORKFLOW.md`, `UI_GUIDELINES.md`, `RULES.md`, etc.).
+  - Complete codebase inventory mapping all route screens, modal dialogs, data tables/ledgers, and print engines.
+  - Purge legacy Vite/boilerplate CSS, ugly scrollbars, and harsh border defaults.
+  - Establish Chalk & Porcelain palette (`#F6F8FA` canvas, `#FFFFFF` cards, `#F95700` terracotta, `#0F172A` obsidian) and Plus Jakarta Sans / JetBrains Mono font declarations.
+
+- **Phase 1: Design Tokens, Global Manager & Atomic UI Primitives**
+  - Central tokens (`tokens.ts`), singleton `GlobalDesignManager`, Tailwind configuration, and atomic component suite covering Categories A through K (210 components).
+  - High-contrast editable workshop tables, A4 print wrapper, and 80mm thermal receipt container.
+
+- **Phase 2: App Shell, Navigation Rail & Role Guard Integration**
+  - Wire `AppShellMasterLayout`, `SidebarNavigationRail`, `GlobalTopHeaderBar`, `RolePerspectiveBadge`, and `RolePermissionGateWrapper` across active application routes.
+  - Role switcher allows instant perspective change (`Owner`, `Manager`, `Advisor`, `Cashier`, `Technician`) with strict DOM unmounting of cost/profit data for restricted roles.
+
+- **Phase 3: Catalog Master & Non-Blocking Vehicle History Service**
+  - Upgrade `/catalog` with `LuxuryDataTableWrapper`, `TableMarginSparkBarCell`, and slide-over part editor.
+  - Connect `SmartPlateAutocompleteInput` to past vehicle job repository for 1-click header auto-fill without blocking manual typing.
+
+- **Phase 4: Workshop Quotation & Accident Estimate Studio**
+  - Upgrade `/workshop/sheet/new` with `VehicleHeader12FieldMatrix` and 3-section line tables (`Labor - Remove & Reassemble`, `Labor - Repair`, `Replacement`).
+  - Wire `Enter`-to-append row ergonomics and `ToggleLockPrivacyButton`.
+  - Integrate `A4PrintCanvasContainer` and `WhatsAppSharePreviewDialog`.
+
+- **Phase 5: Job Card Stage Conversion, Floor Board & Redacted Print**
+  - Implement stage transition modal (`Estimate -> Job Card`) with immutable original estimate snapshot.
+  - Wire `/workshop/board` with floor status columns and mechanic task checkboxes.
+  - Floor view and Job Card print redact 100% of prices and monetary amounts.
+
+- **Phase 6: Workshop Final Invoicing & Insurance Split Billing**
+  - Build `/workshop/invoice/:id` with `InsuranceSplitBillingCalculator` and `AdvancePaymentReceiptRecorder`.
+  - Calculate Customer Excess vs. Insurance Approved Payable to the cent with formal receipt generation.
+
+- **Phase 7: High-Speed Counter POS Terminal & Register Shift**
+  - Upgrade `/pos` with `PosProductTouchCard`, `PosCartItemCard`, and `PosCollectPaymentModal`.
+  - Wire hardware scanner listener (`PosBarcodeScannerStatusPill`), quick cash chips, and 80mm thermal receipt.
+  - Implement `/pos/shift` with opening float, petty cash payouts, and closing variance reconciliation.
+
+- **Phase 8: Embedded Finance & Unified Gross Profit Center**
+  - Build `/finance/profit-ledger` with `DailyCashFlowWaterfallCard` and `UnifiedProfitLedgerTable`.
+  - Connect daily garage expenses (rent, electricity, welding consumables).
+  - Enforce formula: `Net Shop Profit = Gross Sales - Discounts - Direct Costs - Expenses`.
+
+- **Phase 9: Workshop Intelligence & Executive Analytics**
+  - Build `/reports` with `HeroHighlightBarChart`, `MultiSegmentDonutChart`, and insurance aging buckets (`0–15d`, `16–30d`, `30–60d`, `60d+`).
+  - Date range filtering and CSV/PDF export.
+
+- **Phase 10: End-to-End QA, Print Privacy Audit & Regression Verification**
+  - Execute full Vitest suite.
+  - Verify keyboard ergonomics (`Enter` row creation, `⌘K` omnibox, `Esc` dismissal).
+  - Execute print DOM privacy audit across all screens.
+
+---
 
 ## 2. Mandatory Phase Gate Protocol
 For every phase from 0 to 10:
-1. **Plan & Declare:** Review phase scope, define exact types, components, hooks, and repositories to build.
+1. **Plan & Declare:** Review phase scope, define exact tokens, components, hooks, and repositories to build or modify.
 2. **Implement Domain Layer First:** Create interfaces, schemas, calculation formulas, and repository methods before assembling UI.
-3. **Assemble UI Components & Pages:** Ensure all loading, empty, error, and success states exist.
+3. **Assemble UI Components & Pages:** Ensure all loading, empty, error, and success states exist with Porcelain & Chalk aesthetics.
 4. **Execute Verification & Testing:** Run unit tests, visual checks, print audits, and verify business rules.
-5. **Issue Formal Completion Report:** Format using the template specified in Section 15 of the Master Guide, and await user approval before advancing to the subsequent phase.
+5. **Issue Formal Completion Report:** Deliver comprehensive Phase Completion Report and await user review before advancing to the subsequent phase.

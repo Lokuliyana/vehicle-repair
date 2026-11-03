@@ -487,6 +487,17 @@ export class MockFinanceRepository implements IFinanceRepository {
         ? roundCurrency((combinedGrossProfitRs / totalNetSalesRs) * 100)
         : 0;
 
+    // Track total discounts across jobs and POS
+    let totalDiscountsRs = 0;
+    for (const job of invoicedJobs) {
+      totalDiscountsRs += (job.financials.discountRs || 0);
+    }
+    for (const sale of posSalesInFilter) {
+      totalDiscountsRs += (sale.discountRs || 0);
+    }
+    totalDiscountsRs = roundCurrency(totalDiscountsRs);
+    const grossRevenueRs = roundCurrency(totalNetSalesRs + totalDiscountsRs);
+
     // 4. Daily Operating Expenses in filter
     const expensesInFilter = allExpenses.filter((exp) =>
       isDateInFilter(exp.date || exp.createdAt, filter)
@@ -532,6 +543,8 @@ export class MockFinanceRepository implements IFinanceRepository {
     );
 
     return {
+      grossRevenueRs,
+      totalDiscountsRs,
       totalNetSalesRs,
       totalDirectCostRs,
       combinedGrossProfitRs,
@@ -554,6 +567,19 @@ export class MockFinanceRepository implements IFinanceRepository {
       posBuyingCostRs,
       posGrossProfitRs,
     };
+  }
+
+  getUnenteredBuyingCostsCountSync(): number {
+    const allJobs = workshopJobRepository.getAllSync();
+    let count = 0;
+    for (const job of allJobs) {
+      for (const line of job.lines) {
+        if (!line.buyingCostRs || line.buyingCostRs <= 0) {
+          count++;
+        }
+      }
+    }
+    return count;
   }
 
   async getFinanceLedgerItems(
@@ -586,6 +612,7 @@ export class MockFinanceRepository implements IFinanceRepository {
       );
       const cost = roundCurrency(job.financials.totalBuyingCostRs || 0);
       const profit = roundCurrency(sales - cost);
+      const margin = sales > 0 ? roundCurrency((profit / sales) * 100) : 0;
 
       const customer = job.header?.customerInfo || 'Customer';
       const vehicle = job.header?.vehicleNumber || 'Vehicle';
@@ -603,6 +630,11 @@ export class MockFinanceRepository implements IFinanceRepository {
         directCostRs: cost,
         operatingExpenseRs: 0,
         netProfitContributionRs: profit,
+        marginPercent: margin,
+        status: 'INVOICED',
+        vehiclePlate: vehicle,
+        vehicleModel: job.header?.vehicleModel,
+        customerName: customer,
         sourceId: job.id,
         job,
       });
@@ -616,6 +648,7 @@ export class MockFinanceRepository implements IFinanceRepository {
       const sales = roundCurrency(sale.netSalesRs || sale.netTotalSalesRs || 0);
       const cost = roundCurrency(sale.totalBuyingCostRs || 0);
       const profit = roundCurrency(sale.grossProfitRs || sales - cost);
+      const margin = sales > 0 ? roundCurrency((profit / sales) * 100) : 0;
 
       const itemsDesc =
         (sale.items || []).map((i) => `${i.description} (x${i.qty})`).join(', ') ||
@@ -634,6 +667,8 @@ export class MockFinanceRepository implements IFinanceRepository {
         directCostRs: cost,
         operatingExpenseRs: 0,
         netProfitContributionRs: profit,
+        marginPercent: margin,
+        status: 'PAID',
         sourceId: sale.id,
         posSale: sale,
       });
@@ -663,6 +698,8 @@ export class MockFinanceRepository implements IFinanceRepository {
         directCostRs: 0,
         operatingExpenseRs: amount,
         netProfitContributionRs: -amount,
+        marginPercent: 0,
+        status: 'DISBURSED',
         sourceId: exp.id,
         expense: exp,
       });

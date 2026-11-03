@@ -16,7 +16,7 @@ function renderRepairSheetApp(
   if (initialCostMode) {
     localStorage.setItem('antigravity_cost_mode_visible', 'true');
   } else {
-    localStorage.removeItem('antigravity_cost_mode_visible');
+    localStorage.setItem('antigravity_cost_mode_visible', 'false');
   }
 
   const testRouter = createMemoryRouter(
@@ -326,5 +326,102 @@ describe('Unified Repair Sheet Page (Phase 4)', () => {
     expect(screen.queryByTestId('cost-profit-panel')).not.toBeInTheDocument();
     expect(screen.queryByTestId('cost-input-l1')).not.toBeInTheDocument();
     expect(screen.queryByText(/Buying Cost \(Rs\.\)/i)).not.toBeInTheDocument();
+  });
+
+  it('renders Sticky Bottom Executive Margin & Total Bar with live subtotals and gated metrics', async () => {
+    // 1. OWNER with cost mode ON
+    const { unmount } = renderRepairSheetApp(['/workshop/sheet/job-1'], 'OWNER', true);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('executive-margin-bottom-bar')).toBeInTheDocument();
+    });
+
+    const bottomBar = screen.getByTestId('executive-margin-bottom-bar');
+    expect(bottomBar).toHaveTextContent(/Labor Subtotal/i);
+    expect(bottomBar).toHaveTextContent(/Parts Subtotal/i);
+    expect(bottomBar).toHaveTextContent(/Gross Total/i);
+
+    // Cost & Profit metrics should be rendered for OWNER
+    expect(screen.getByTestId('bottom-bar-total-cost')).toBeInTheDocument();
+    expect(screen.getByTestId('bottom-bar-gross-profit')).toBeInTheDocument();
+    expect(screen.getByTestId('bottom-bar-gross-margin')).toBeInTheDocument();
+
+    unmount();
+
+    // 2. SERVICE_ADVISOR
+    renderRepairSheetApp(['/workshop/sheet/job-1'], 'SERVICE_ADVISOR', true);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('executive-margin-bottom-bar')).toBeInTheDocument();
+    });
+
+    // Subtotals present, but cost/profit metrics strictly excluded
+    expect(screen.queryByTestId('bottom-bar-total-cost')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('bottom-bar-gross-profit')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('bottom-bar-gross-margin')).not.toBeInTheDocument();
+  });
+
+  it('renders Admin Cost switch for OWNER and dynamically toggles cost mode', async () => {
+    renderRepairSheetApp(['/workshop/sheet/job-1'], 'OWNER', false);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('admin-cost-mode-switch')).toBeInTheDocument();
+    });
+
+    // Initially cost panel is hidden
+    expect(screen.queryByTestId('cost-profit-panel')).not.toBeInTheDocument();
+
+    // Toggle ON
+    const costSwitch = screen.getByTestId('admin-cost-mode-switch');
+    fireEvent.click(costSwitch);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('cost-profit-panel')).toBeInTheDocument();
+      expect(screen.getByTestId('bottom-bar-total-cost')).toBeInTheDocument();
+    });
+
+    // Toggle OFF
+    fireEvent.click(costSwitch);
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('cost-profit-panel')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('bottom-bar-total-cost')).not.toBeInTheDocument();
+    });
+  });
+
+  it('completely hides Admin Cost switch for SERVICE_ADVISOR and TECHNICIAN', async () => {
+    // SERVICE_ADVISOR
+    const { unmount } = renderRepairSheetApp(['/workshop/sheet/job-1'], 'SERVICE_ADVISOR', false);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('sheet-header-grid')).toBeInTheDocument();
+    });
+    expect(screen.queryByTestId('admin-cost-mode-switch')).not.toBeInTheDocument();
+
+    unmount();
+
+    // TECHNICIAN
+    renderRepairSheetApp(['/workshop/sheet/job-1'], 'TECHNICIAN', false);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('technician-progress-panel')).toBeInTheDocument();
+    });
+    expect(screen.queryByTestId('admin-cost-mode-switch')).not.toBeInTheDocument();
+  });
+
+  it('opens WhatsApp share modal when clicking WhatsApp button', async () => {
+    renderRepairSheetApp(['/workshop/sheet/job-1'], 'OWNER');
+
+    await waitFor(() => {
+      expect(screen.getByTestId('whatsapp-share-btn')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId('whatsapp-share-btn'));
+
+    await waitFor(() => {
+      expect(screen.getByText('WhatsApp Summary Share')).toBeInTheDocument();
+      expect(screen.getByText(/ANTIGRAVITY AUTO CARE/i)).toBeInTheDocument();
+      expect(screen.getAllByText(/JOB-2026-0042/i).length).toBeGreaterThanOrEqual(2);
+    });
   });
 });

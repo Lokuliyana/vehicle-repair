@@ -13,6 +13,16 @@ import { PosTerminalPage } from '@/features/pos/pages/PosTerminalPage';
 import { ThermalReceiptPrint } from '@/components/print/ThermalReceiptPrint';
 import { PosShiftDrawerModal } from '@/features/pos/components/PosShiftDrawerModal';
 import { PosPaymentModal } from '@/features/pos/components/PosPaymentModal';
+import { PosShiftManagementPage } from '@/features/pos/pages/PosShiftManagementPage';
+import {
+  PosCollectPaymentModal,
+  PosOnTheFlyCustomItemBar,
+  PosTouchNumericKeypad,
+  PosPettyCashOutDrawer,
+  PosShiftReconciliationSheet,
+  Thermal80mmReceiptContainer,
+  ThermalReceiptItemizedTable,
+} from '@/design-system/components/pos-counter-components';
 import { formatRs } from '@/utils/currency';
 
 function TestWrapper({
@@ -701,6 +711,421 @@ describe('Phase 7: Counter / Showroom POS & Shift Cash Management', () => {
       expect(printSpy).toHaveBeenCalled();
 
       printSpy.mockRestore();
+    });
+  });
+
+  describe('7. Phase 7: RestroBit POS Split-Screen Workspace, Numpad, Shift & Thermal Receipt Tests', () => {
+    it('enters on-the-fly custom walk-in item with inline buying cost via PosOnTheFlyCustomItemBar', () => {
+      const onAddCustom = vi.fn();
+      render(<PosOnTheFlyCustomItemBar onAddCustomItem={onAddCustom} />);
+
+      const nameInput = screen.getByTestId('on-the-fly-name-input');
+      const priceInput = screen.getByTestId('on-the-fly-price-input');
+      const costInput = screen.getByTestId('on-the-fly-cost-input');
+      const addBtn = screen.getByTestId('on-the-fly-add-btn');
+
+      fireEvent.change(nameInput, { target: { value: 'Brake Fluid DOT4 500ml' } });
+      fireEvent.change(priceInput, { target: { value: '1850' } });
+      fireEvent.change(costInput, { target: { value: '1100' } });
+
+      fireEvent.click(addBtn);
+
+      expect(onAddCustom).toHaveBeenCalledWith(
+        expect.objectContaining({
+          description: 'Brake Fluid DOT4 500ml',
+          unitSellingPriceRs: 1850,
+          unitBuyingCostRs: 1100,
+        })
+      );
+    });
+
+    it('interacts with PosTouchNumericKeypad for rapid numeric, backspace, and clear input', () => {
+      const onKeyPress = vi.fn();
+      const onClear = vi.fn();
+      const onBackspace = vi.fn();
+
+      render(
+        <PosTouchNumericKeypad
+          onKeyPress={onKeyPress}
+          onClear={onClear}
+          onBackspace={onBackspace}
+        />
+      );
+
+      // Key clicks
+      fireEvent.click(screen.getByTestId('numpad-key-5'));
+      fireEvent.click(screen.getByTestId('numpad-key-0'));
+      fireEvent.click(screen.getByTestId('numpad-key-0'));
+      expect(onKeyPress).toHaveBeenCalledWith('5');
+      expect(onKeyPress).toHaveBeenCalledWith('0');
+
+      // Backspace
+      fireEvent.click(screen.getByTestId('numpad-key-⌫'));
+      expect(onBackspace).toHaveBeenCalled();
+
+      // Clear
+      fireEvent.click(screen.getByTestId('numpad-key-C'));
+      expect(onClear).toHaveBeenCalled();
+    });
+
+    it('tenders multi-method split payment (Cash + Card + Bank QR) via PosCollectPaymentModal', () => {
+      const onComplete = vi.fn();
+      render(
+        <PosCollectPaymentModal
+          open={true}
+          orderNumber="ORD-SPLIT-99"
+          totalRs={15000}
+          onClose={vi.fn()}
+          onComplete={onComplete}
+        />
+      );
+
+      // Select Split Bill
+      const splitTab = screen.getByTestId('payment-method-split-tab');
+      fireEvent.click(splitTab);
+
+      const cashInput = screen.getByTestId('split-cash-input');
+      const cardInput = screen.getByTestId('split-card-input');
+      const qrInput = screen.getByTestId('split-transfer-input');
+
+      // Allocate: 5000 Cash, 7000 Card, 3000 QR
+      fireEvent.change(cashInput, { target: { value: '5000' } });
+      fireEvent.change(cardInput, { target: { value: '7000' } });
+      fireEvent.change(qrInput, { target: { value: '3000' } });
+
+      expect(screen.getByTestId('split-remaining-indicator')).toHaveTextContent('Balanced');
+
+      // Submit
+      const submitBtn = screen.getByTestId('pos-payment-submit-btn');
+      fireEvent.click(submitBtn);
+
+      expect(onComplete).toHaveBeenCalledWith(
+        expect.objectContaining({
+          method: 'SPLIT',
+          amountTenderedRs: 15000,
+          splitDetails: expect.objectContaining({
+            cashAmountRs: 5000,
+            cardAmountRs: 7000,
+            bankTransferAmountRs: 3000,
+          }),
+        })
+      );
+    });
+
+    it('calculates shift opening float, cash sales, petty cash out, and drawer reconciliation variance', () => {
+      const onCloseShift = vi.fn();
+      render(
+        <PosShiftReconciliationSheet
+          openingFloatRs={10000}
+          cashSalesRs={8000}
+          pettyCashOutRs={1500}
+          cashInRs={500}
+          onCloseShift={onCloseShift}
+        />
+      );
+
+      // Expected In Drawer: 10000 + 500 + 8000 - 1500 = 17000
+      expect(screen.getByTestId('expected-drawer-cash-value')).toHaveTextContent(formatRs(17000));
+      expect(screen.getByTestId('shift-variance-badge')).toHaveTextContent('Balanced');
+
+      const countedInput = screen.getByTestId('close-counted-cash-input');
+
+      // Cash Overage: counted 17,800 (+800)
+      fireEvent.change(countedInput, { target: { value: '17800' } });
+      expect(screen.getByTestId('shift-variance-badge')).toHaveTextContent(
+        `Cash Over (+${formatRs(800)})`
+      );
+
+      // Cash Shortage: counted 16,200 (-800)
+      fireEvent.change(countedInput, { target: { value: '16200' } });
+      expect(screen.getByTestId('shift-variance-badge')).toHaveTextContent(
+        `Cash Short (-${formatRs(800)})`
+      );
+
+      // Finalize
+      fireEvent.click(screen.getByTestId('confirm-close-shift-btn'));
+      expect(onCloseShift).toHaveBeenCalledWith(16200);
+    });
+
+    it('disburses garage expenses directly from cash drawer using PosPettyCashOutDrawer', () => {
+      const onRecord = vi.fn();
+      const onClose = vi.fn();
+
+      render(
+        <PosPettyCashOutDrawer
+          open={true}
+          onClose={onClose}
+          onRecord={onRecord}
+        />
+      );
+
+      const amountInput = screen.getByTestId('petty-cash-amount-input');
+      const reasonInput = screen.getByTestId('petty-cash-reason-input');
+      const submitBtn = screen.getByTestId('petty-cash-submit-btn');
+
+      fireEvent.change(amountInput, { target: { value: '750' } });
+      fireEvent.change(reasonInput, { target: { value: 'Urgent welding gas refill' } });
+      fireEvent.click(submitBtn);
+
+      expect(onRecord).toHaveBeenCalledWith(750, 'Urgent welding gas refill');
+      expect(onClose).toHaveBeenCalled();
+    });
+
+    it('renders 80mm thermal receipt with Thermal80mmReceiptContainer & ThermalReceiptItemizedTable without cost leakage', () => {
+      const items = [
+        { name: 'Castrol Magnatec 10W-40 (4L)', qty: 1, unitPriceRs: 12500, totalRs: 12500 },
+        { name: 'Vic Oil Filter C-113', qty: 2, unitPriceRs: 1800, totalRs: 3600 },
+      ];
+
+      const { container } = render(
+        <Thermal80mmReceiptContainer>
+          <div className="text-center font-bold">500 LABS RESTROBIT POS</div>
+          <ThermalReceiptItemizedTable items={items} />
+          <div className="flex justify-between font-bold">
+            <span>NET TOTAL:</span>
+            <span>Rs. 16,100.00</span>
+          </div>
+          <div className="flex justify-between">
+            <span>Cash Tendered:</span>
+            <span>Rs. 20,000.00</span>
+          </div>
+          <div className="flex justify-between">
+            <span>Change Due:</span>
+            <span>Rs. 3,900.00</span>
+          </div>
+        </Thermal80mmReceiptContainer>
+      );
+
+      expect(screen.getByText('500 LABS RESTROBIT POS')).toBeInTheDocument();
+      expect(screen.getByText('Castrol Magnatec 10W-40 (4L)')).toBeInTheDocument();
+      expect(screen.getByText('Vic Oil Filter C-113')).toBeInTheDocument();
+      expect(screen.getByText('Rs. 16,100.00')).toBeInTheDocument();
+      expect(screen.getByText('Rs. 3,900.00')).toBeInTheDocument();
+
+      // STRICT ZERO COST LEAKAGE:
+      expect(container.innerHTML).not.toContain('Buying Cost');
+      expect(container.innerHTML).not.toContain('Gross Profit');
+      expect(container.innerHTML).not.toContain('Margin');
+    });
+
+    it('renders POS Shift Management Cockpit (/pos/shift) with live duration timer and balance KPI cards', async () => {
+      await act(async () => {
+        render(
+          <TestWrapper initialRole="OWNER" enableCost={true}>
+            <PosShiftManagementPage />
+          </TestWrapper>
+        );
+      });
+
+      expect(screen.getByTestId('pos-shift-management-page')).toBeInTheDocument();
+      expect(screen.getByTestId('shift-status-badge')).toBeInTheDocument();
+      expect(screen.getByTestId('shift-duration-timer')).toBeInTheDocument();
+      expect(screen.getByTestId('shift-kpi-opening-float')).toHaveTextContent(formatRs(15000));
+      expect(screen.getByTestId('shift-kpi-expected-drawer-cash')).toHaveTextContent(formatRs(15000));
+      expect(screen.getByTestId('shift-drawer-entries-table')).toBeInTheDocument();
+    });
+  });
+
+  describe('8. Skeptical Audit & Edge Case Verification', () => {
+    it('sets exact tendered amount on Exact cash preset click without doubling', () => {
+      render(
+        <PosCollectPaymentModal
+          open={true}
+          totalRs={4200}
+          onClose={vi.fn()}
+        />
+      );
+
+      // Initially 4200
+      expect(screen.getByTestId('pos-payment-amount-input')).toHaveValue(4200);
+
+      // Click +1000 -> 5200
+      fireEvent.click(screen.getByTestId('quick-cash-1000'));
+      expect(screen.getByTestId('pos-payment-amount-input')).toHaveValue(5200);
+      expect(screen.getByTestId('pos-change-due')).toHaveTextContent(formatRs(1000));
+
+      // Click Exact -> resets cleanly back to 4200 (not 5200 + 4200 = 9400!)
+      fireEvent.click(screen.getByTestId('quick-cash-exact'));
+      expect(screen.getByTestId('pos-payment-amount-input')).toHaveValue(4200);
+      expect(screen.getByTestId('pos-change-due')).toHaveTextContent(formatRs(0));
+    });
+
+    it('enters numeric tender cleanly via PosTouchNumericKeypad in PosCollectPaymentModal without appending to default total', () => {
+      render(
+        <PosCollectPaymentModal
+          open={true}
+          totalRs={4200}
+          onClose={vi.fn()}
+        />
+      );
+
+      // Typing 5 on keypad replaces default 4200 with 5
+      fireEvent.click(screen.getByTestId('numpad-key-5'));
+      expect(screen.getByTestId('pos-payment-amount-input')).toHaveValue(5);
+
+      // Subsequent keystrokes append
+      fireEvent.click(screen.getByTestId('numpad-key-0'));
+      fireEvent.click(screen.getByTestId('numpad-key-0'));
+      fireEvent.click(screen.getByTestId('numpad-key-0'));
+      expect(screen.getByTestId('pos-payment-amount-input')).toHaveValue(5000);
+      expect(screen.getByTestId('pos-change-due')).toHaveTextContent(formatRs(800));
+
+      // Backspace
+      fireEvent.click(screen.getByTestId('numpad-key-⌫'));
+      expect(screen.getByTestId('pos-payment-amount-input')).toHaveValue(500);
+
+      // Clear
+      fireEvent.click(screen.getByTestId('numpad-key-C'));
+      expect(screen.getByTestId('pos-payment-amount-input')).toHaveValue(0);
+    });
+
+    it('does NOT trigger global barcode scan listener when a modal or drawer is open', async () => {
+      await act(async () => {
+        render(
+          <TestWrapper initialRole="OWNER" enableCost={true}>
+            <PosTerminalPage />
+          </TestWrapper>
+        );
+      });
+
+      // Initially cart is empty
+      expect(screen.getByTestId('cart-count-badge')).toHaveTextContent('0 items');
+
+      // Open custom item modal
+      fireEvent.click(screen.getByTestId('pos-add-custom-item-btn'));
+      expect(screen.getByTestId('pos-custom-item-form')).toBeInTheDocument();
+
+      // Simulate hardware scanner keystrokes in background while modal is open
+      const barcodeChars = '8901234567891'.split('');
+      await act(async () => {
+        for (const char of barcodeChars) {
+          window.dispatchEvent(new KeyboardEvent('keydown', { key: char, bubbles: true }));
+        }
+        window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+      });
+
+      // Cart MUST still be empty because modal was open!
+      expect(screen.getByTestId('cart-count-badge')).toHaveTextContent('0 items');
+    });
+
+    it('adds item directly via inline on-the-fly bar on PosTerminalPage', async () => {
+      await act(async () => {
+        render(
+          <TestWrapper initialRole="OWNER" enableCost={true}>
+            <PosTerminalPage />
+          </TestWrapper>
+        );
+      });
+
+      const nameInput = screen.getByTestId('on-the-fly-name-input');
+      const priceInput = screen.getByTestId('on-the-fly-price-input');
+      const costInput = screen.getByTestId('on-the-fly-cost-input');
+      const addBtn = screen.getByTestId('on-the-fly-add-btn');
+
+      await act(async () => {
+        fireEvent.change(nameInput, { target: { value: 'Direct Counter Wiper Blade' } });
+        fireEvent.change(priceInput, { target: { value: '2500' } });
+        fireEvent.change(costInput, { target: { value: '1500' } });
+        fireEvent.click(addBtn);
+      });
+
+      expect(screen.getByText('Direct Counter Wiper Blade')).toBeInTheDocument();
+      expect(screen.getByTestId('cart-count-badge')).toHaveTextContent('1 item');
+      expect(screen.getByTestId('cart-net-payable')).toHaveTextContent(formatRs(2500));
+    });
+
+    it('PRIVACY INVARIANT: hides on-the-fly cost input when role is CASHIER', async () => {
+      await act(async () => {
+        render(
+          <TestWrapper initialRole="CASHIER" enableCost={false}>
+            <PosTerminalPage />
+          </TestWrapper>
+        );
+      });
+
+      expect(screen.getByTestId('on-the-fly-name-input')).toBeInTheDocument();
+      expect(screen.getByTestId('on-the-fly-price-input')).toBeInTheDocument();
+      // Cost input MUST NOT be rendered for CASHIER
+      expect(screen.queryByTestId('on-the-fly-cost-input')).not.toBeInTheDocument();
+    });
+
+    it('edits customer info, holds cart in drafts, and restores all fields upon resume', async () => {
+      await act(async () => {
+        render(
+          <TestWrapper initialRole="OWNER" enableCost={true}>
+            <PosTerminalPage />
+          </TestWrapper>
+        );
+      });
+
+      // Add one item
+      const barcodeInput = screen.getByTestId('pos-barcode-input');
+      const submitBtn = screen.getByTestId('pos-barcode-submit-btn');
+      await act(async () => {
+        fireEvent.change(barcodeInput, { target: { value: 'FLT-DEN-C110' } });
+        fireEvent.click(submitBtn);
+      });
+
+      // Click Edit customer
+      const changeBtn = screen.getByText('Change');
+      fireEvent.click(changeBtn);
+
+      const nameInput = screen.getByTestId('walk-in-customer-name-input');
+      const phoneInput = screen.getByPlaceholderText('Phone (optional)');
+      const vehInput = screen.getByPlaceholderText('Vehicle Plate (optional)');
+      const saveBtn = screen.getByText('Save Info');
+
+      fireEvent.change(nameInput, { target: { value: 'Anura Bandara' } });
+      fireEvent.change(phoneInput, { target: { value: '0771234567' } });
+      fireEvent.change(vehInput, { target: { value: 'WP CAD-8899' } });
+      fireEvent.click(saveBtn);
+
+      expect(screen.getByText('Anura Bandara')).toBeInTheDocument();
+      expect(screen.getByText('(0771234567)')).toBeInTheDocument();
+      expect(screen.getByText('WP CAD-8899')).toBeInTheDocument();
+
+      // Hold cart
+      const holdBtn = screen.getByTestId('pos-action-hold');
+      await act(async () => {
+        fireEvent.click(holdBtn);
+      });
+
+      // Cart cleared
+      expect(screen.getByTestId('cart-count-badge')).toHaveTextContent('0 items');
+
+      // Open held bills drawer
+      const openHeldBtn = screen.getByTitle('Parked Carts');
+      await act(async () => {
+        fireEvent.click(openHeldBtn);
+      });
+
+      expect(screen.getByTestId('pos-held-bills-drawer')).toBeInTheDocument();
+
+      // Find Resume Cart button in drawer
+      const resumeBtn = screen.getByText('Resume Cart');
+      await act(async () => {
+        fireEvent.click(resumeBtn);
+      });
+
+      // Cart restored with customer info
+      expect(screen.getByTestId('cart-count-badge')).toHaveTextContent('1 item');
+      expect(screen.getByText('Anura Bandara')).toBeInTheDocument();
+      expect(screen.getByText('WP CAD-8899')).toBeInTheDocument();
+    });
+
+    it('shows warning alert and disables payment submit when register shift is closed', () => {
+      render(
+        <PosCollectPaymentModal
+          open={true}
+          totalRs={5000}
+          isShiftOpen={false}
+          onClose={vi.fn()}
+        />
+      );
+
+      expect(screen.getByTestId('shift-closed-alert')).toBeInTheDocument();
+      const submitBtn = screen.getByTestId('pos-payment-submit-btn');
+      expect(submitBtn).toBeDisabled();
     });
   });
 });

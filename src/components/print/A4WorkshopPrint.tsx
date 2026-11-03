@@ -2,6 +2,7 @@ import React from 'react';
 import { WorkshopJobSheet } from '@/types';
 import { formatRs } from '@/utils/currency';
 import { cn } from '@/utils/cn';
+import { A4FinancialTotalsPrintBlock } from '@/design-system/components/print-abstractions';
 
 export interface A4WorkshopPrintProps {
   jobSheet: WorkshopJobSheet;
@@ -49,6 +50,9 @@ export const A4WorkshopPrint = React.forwardRef<HTMLDivElement, A4WorkshopPrintP
             ALL KIND OF VEHICLE, ELECTRICAL & MECHANICAL REPAIRS, SCANNING, TINKERING,
             ACCIDENT REPAIR & AUTO PAINT
           </p>
+          <p className="text-[8.5pt] font-extrabold tracking-widest text-black uppercase mt-0.5">
+            MECHANICAL | ELECTRICAL | SCANNING | TINKERING | AUTO PAINT | SPARE PARTS
+          </p>
         </div>
 
         {/* Document Header & Title */}
@@ -79,7 +83,7 @@ export const A4WorkshopPrint = React.forwardRef<HTMLDivElement, A4WorkshopPrintP
           </div>
         </div>
 
-        {/* 12-Field Workshop Header Grid */}
+        {/* Workshop Intake Header Grid */}
         <div className="border border-black mb-4">
           {/* Row 1 */}
           <div className="grid grid-cols-2 border-b border-black divide-x divide-black">
@@ -168,10 +172,15 @@ export const A4WorkshopPrint = React.forwardRef<HTMLDivElement, A4WorkshopPrintP
                 <th className="border-r border-black p-1 text-left font-bold">Description</th>
                 {isJobCard ? (
                   <>
-                    <th className="w-36 border-r border-black p-1 text-left font-bold">
-                      Assigned Tech
+                    <th className="w-32 border-r border-black p-1 text-left font-bold">
+                      Assigned Technician
                     </th>
-                    <th className="w-20 p-1 text-center font-bold">Done</th>
+                    <th className="w-24 border-r border-black p-1 text-center font-bold">
+                      Part Issued [ ]
+                    </th>
+                    <th className="w-28 p-1 text-center font-bold">
+                      Task Completed [ ]
+                    </th>
                   </>
                 ) : (
                   <th className="w-28 p-1 text-right font-bold">Amount (Rs.)</th>
@@ -181,7 +190,7 @@ export const A4WorkshopPrint = React.forwardRef<HTMLDivElement, A4WorkshopPrintP
             <tbody>
               {removeReassembleLines.length === 0 ? (
                 <tr className="border-b border-black">
-                  <td colSpan={isJobCard ? 4 : 3} className="p-1.5 text-center text-gray-500 italic">
+                  <td colSpan={isJobCard ? 5 : 3} className="p-1.5 text-center text-gray-500 italic">
                     - Nil -
                   </td>
                 </tr>
@@ -200,6 +209,7 @@ export const A4WorkshopPrint = React.forwardRef<HTMLDivElement, A4WorkshopPrintP
                     {isJobCard ? (
                       <>
                         <td className="border-r border-black p-1">{line.assignedTechnician || '-'}</td>
+                        <td className="border-r border-black p-1 text-center font-mono">-</td>
                         <td className="p-1 text-center font-mono">
                           {line.isCompleted ? '[X]' : '[ ]'}
                         </td>
@@ -240,10 +250,15 @@ export const A4WorkshopPrint = React.forwardRef<HTMLDivElement, A4WorkshopPrintP
                 <th className="border-r border-black p-1 text-left font-bold">Description</th>
                 {isJobCard ? (
                   <>
-                    <th className="w-36 border-r border-black p-1 text-left font-bold">
-                      Assigned Tech
+                    <th className="w-32 border-r border-black p-1 text-left font-bold">
+                      Assigned Technician
                     </th>
-                    <th className="w-20 p-1 text-center font-bold">Done</th>
+                    <th className="w-24 border-r border-black p-1 text-center font-bold">
+                      Part Issued [ ]
+                    </th>
+                    <th className="w-28 p-1 text-center font-bold">
+                      Task Completed [ ]
+                    </th>
                   </>
                 ) : (
                   <th className="w-28 p-1 text-right font-bold">Amount (Rs.)</th>
@@ -253,7 +268,7 @@ export const A4WorkshopPrint = React.forwardRef<HTMLDivElement, A4WorkshopPrintP
             <tbody>
               {repairLines.length === 0 ? (
                 <tr className="border-b border-black">
-                  <td colSpan={isJobCard ? 4 : 3} className="p-1.5 text-center text-gray-500 italic">
+                  <td colSpan={isJobCard ? 5 : 3} className="p-1.5 text-center text-gray-500 italic">
                     - Nil -
                   </td>
                 </tr>
@@ -272,6 +287,7 @@ export const A4WorkshopPrint = React.forwardRef<HTMLDivElement, A4WorkshopPrintP
                     {isJobCard ? (
                       <>
                         <td className="border-r border-black p-1">{line.assignedTechnician || '-'}</td>
+                        <td className="border-r border-black p-1 text-center font-mono">-</td>
                         <td className="p-1 text-center font-mono">
                           {line.isCompleted ? '[X]' : '[ ]'}
                         </td>
@@ -312,10 +328,15 @@ export const A4WorkshopPrint = React.forwardRef<HTMLDivElement, A4WorkshopPrintP
                 <th className="border-r border-black p-1 text-left font-bold">Description</th>
                 {isJobCard ? (
                   <>
-                    <th className="w-36 border-r border-black p-1 text-left font-bold">
-                      Assigned Tech
+                    <th className="w-32 border-r border-black p-1 text-left font-bold">
+                      Assigned Technician
                     </th>
-                    <th className="w-20 p-1 text-center font-bold">Done</th>
+                    <th className="w-24 border-r border-black p-1 text-center font-bold">
+                      Part Issued [ ]
+                    </th>
+                    <th className="w-28 p-1 text-center font-bold">
+                      Task Completed [ ]
+                    </th>
                   </>
                 ) : (
                   <th className="w-28 p-1 text-right font-bold">Amount (Rs.)</th>
@@ -325,7 +346,7 @@ export const A4WorkshopPrint = React.forwardRef<HTMLDivElement, A4WorkshopPrintP
             <tbody>
               {replacementLines.length === 0 ? (
                 <tr className="border-b border-black">
-                  <td colSpan={isJobCard ? 4 : 3} className="p-1.5 text-center text-gray-500 italic">
+                  <td colSpan={isJobCard ? 5 : 3} className="p-1.5 text-center text-gray-500 italic">
                     - Nil -
                   </td>
                 </tr>
@@ -344,6 +365,9 @@ export const A4WorkshopPrint = React.forwardRef<HTMLDivElement, A4WorkshopPrintP
                     {isJobCard ? (
                       <>
                         <td className="border-r border-black p-1">{line.assignedTechnician || '-'}</td>
+                        <td className="border-r border-black p-1 text-center font-mono">
+                          {line.isCompleted ? '[X]' : '[ ]'}
+                        </td>
                         <td className="p-1 text-center font-mono">
                           {line.isCompleted ? '[X]' : '[ ]'}
                         </td>
@@ -411,67 +435,21 @@ export const A4WorkshopPrint = React.forwardRef<HTMLDivElement, A4WorkshopPrintP
               </div>
             )}
 
-            <div className="flex justify-end">
-              <div className="w-72 border border-black text-[11px]">
-              <div className="flex justify-between p-1.5 border-b border-black">
-                <span className="font-semibold">Gross Total:</span>
-                <span>
-                  {formatRs(
-                    financials.subtotalRemoveReassembleRs +
-                      financials.subtotalRepairRs +
-                      financials.subtotalReplacementRs
-                  )}
-                </span>
-              </div>
-              {financials.discountRs > 0 && (
-                <div className="flex justify-between p-1.5 border-b border-black text-red-700">
-                  <span className="font-semibold">Discount:</span>
-                  <span>- {formatRs(financials.discountRs)}</span>
-                </div>
-              )}
-              {financials.taxRs > 0 && (
-                <div className="flex justify-between p-1.5 border-b border-black">
-                  <span className="font-semibold">Tax:</span>
-                  <span>+ {formatRs(financials.taxRs)}</span>
-                </div>
-              )}
-              <div className="flex justify-between p-1.5 border-b border-black bg-gray-100 font-bold text-[12px]">
-                <span>Grand Total:</span>
-                <span>{formatRs(financials.grandTotalSalesRs)}</span>
-              </div>
-
-              {/* Split billing if Insurance Claim */}
-              {financials.insuranceApprovedRs > 0 && (
-                <>
-                  <div className="flex justify-between p-1.5 border-b border-black text-blue-900">
-                    <span className="font-semibold">Insurance Approved:</span>
-                    <span>{formatRs(financials.insuranceApprovedRs)}</span>
-                  </div>
-                  <div className="flex justify-between p-1.5 border-b border-black font-semibold">
-                    <span>Customer Payable:</span>
-                    <span>{formatRs(financials.customerPayableRs)}</span>
-                  </div>
-                </>
-              )}
-              {financials.advancePaidRs > 0 && (
-                <div className="flex justify-between p-1.5 border-b border-black text-emerald-800">
-                  <span className="font-semibold">Advance Paid:</span>
-                  <span>{formatRs(financials.advancePaidRs)}</span>
-                </div>
-              )}
-              {financials.balanceDueRs !== undefined &&
-                (financials.insuranceApprovedRs > 0 ||
-                  financials.advancePaidRs > 0 ||
-                  docStage === 'INVOICE') && (
-                  <div className="flex justify-between p-1.5 font-bold bg-amber-50 text-amber-950">
-                    <span>Balance Due:</span>
-                    <span>{formatRs(financials.balanceDueRs)}</span>
-                  </div>
-                )}
-            </div>
+            <A4FinancialTotalsPrintBlock
+              grossTotalRs={
+                financials.subtotalRemoveReassembleRs +
+                financials.subtotalRepairRs +
+                financials.subtotalReplacementRs
+              }
+              discountRs={financials.discountRs}
+              taxRs={financials.taxRs}
+              insuranceApprovedRs={financials.insuranceApprovedRs}
+              customerPayableRs={financials.customerPayableRs}
+              advancePaidRs={financials.advancePaidRs}
+              balanceDueRs={financials.balanceDueRs}
+            />
           </div>
-        </div>
-      )}
+        )}
 
         {/* Signatures & Job Card Floor Section */}
         {isJobCard && (
@@ -491,9 +469,11 @@ export const A4WorkshopPrint = React.forwardRef<HTMLDivElement, A4WorkshopPrintP
 
         {/* Bottom Disclaimers */}
         <div className="print-footer mt-auto pt-4 border-t border-black text-center space-y-1">
-          <p className="text-[10px] italic text-gray-700">
+          <p className="text-[10px] italic text-gray-700" data-testid="a4-computer-generated-footer">
             {isJobCard
               ? 'Workshop Floor Physical Job Card. Return signed document to service desk upon task completion.'
+              : docStage === 'INVOICE'
+              ? 'This is a computer-generated tax invoice and does not carry a physical signature.'
               : 'Computer generated estimate and does not carry a signature.'}
           </p>
           <p className="text-[12px] font-bold tracking-[0.3em] uppercase text-black pt-1">

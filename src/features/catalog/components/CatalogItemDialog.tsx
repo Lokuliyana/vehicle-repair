@@ -18,6 +18,8 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { RolePermissionGateWrapper } from '@/design-system/components/finance-privacy-components';
+import { FileDropzoneDashed } from '@/design-system/components/form-inputs';
 
 export interface CatalogItemDialogProps {
   open: boolean;
@@ -381,27 +383,25 @@ export function CatalogItemDialog({
             </div>
 
             {/* Buying Cost: STRICTLY GUARDED FOR OWNER & MANAGER */}
-            {permissions.canViewCosts ? (
-              <div className="bg-amber-100/60 p-2 rounded-md border border-amber-300">
-                <label className="flex items-center gap-1 font-bold text-amber-950 uppercase tracking-wider mb-1">
-                  <Lock className="h-3 w-3 text-amber-700" />
-                  Buying Cost (Rs.)
-                </label>
-                <Input
-                  type="number"
-                  min="0"
-                  step="any"
-                  value={buyingCostRs}
-                  onChange={(e) => setBuyingCostRs(e.target.value)}
-                  className="font-mono font-bold bg-white text-amber-900 border-amber-400"
-                  data-testid="catalog-form-buying-cost"
-                />
-              </div>
-            ) : (
-              <div className="hidden" aria-hidden="true">
-                {/* Omitted completely from DOM for non-management */}
-              </div>
-            )}
+            <RolePermissionGateWrapper allowedRoles={['OWNER', 'WORKSHOP_MANAGER']}>
+              {permissions.canViewCosts ? (
+                <div className="bg-amber-100/60 p-2 rounded-md border border-amber-300">
+                  <label className="flex items-center gap-1 font-bold text-amber-950 uppercase tracking-wider mb-1">
+                    <Lock className="h-3 w-3 text-amber-700" />
+                    Buying Cost (Rs.)
+                  </label>
+                  <Input
+                    type="number"
+                    min="0"
+                    step="any"
+                    value={buyingCostRs}
+                    onChange={(e) => setBuyingCostRs(e.target.value)}
+                    className="font-mono font-bold bg-white text-amber-900 border-amber-400"
+                    data-testid="catalog-form-buying-cost"
+                  />
+                </div>
+              ) : null}
+            </RolePermissionGateWrapper>
 
             <div>
               <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1">
@@ -454,6 +454,17 @@ export function CatalogItemDialog({
               </div>
             </div>
           )}
+
+          {/* Specification Document & Image Dropzone */}
+          <div>
+            <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1">
+              Part Diagram / Photo / Spec Sheet
+            </label>
+            <FileDropzoneDashed
+              label="Drop part diagrams, collision reference images, or manufacturer specs"
+              hint="PNG, JPG, WebP up to 10MB"
+            />
+          </div>
 
           {/* Active status */}
           <div className="flex items-center gap-2 pt-1">

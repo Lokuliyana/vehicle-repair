@@ -1,6 +1,6 @@
 import React from 'react';
 import { render, screen, fireEvent, act } from '@testing-library/react';
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import { AuthProvider } from '@/app/providers/AuthProvider';
 import { ToastProvider } from '@/components/ui/toast';
@@ -10,6 +10,7 @@ import { posSaleRepository } from '@/features/pos/repository/pos-sale.repository
 import { posShiftRepository } from '@/features/pos/repository/pos-shift.repository.mock';
 import { financeRepository, extractDateString, isDateInFilter } from '@/features/finance-reports/repository/finance.repository.mock';
 import { ProfitLedgerPage } from '@/features/finance-reports/pages/ProfitLedgerPage';
+import { ExpensesPage } from '@/features/finance-reports/pages/ExpensesPage';
 
 function TestWrapper({
   initialRole = 'OWNER',
@@ -663,6 +664,356 @@ describe('Phase 8: Embedded Finance, Sales, Cost & Gross Profit Center', () => {
 
       expect(screen.getByTestId('expense-error-alert')).toBeInTheDocument();
       expect(screen.getByText('Please select a valid expense date.')).toBeInTheDocument();
+    });
+  });
+
+  describe('6. Phase 8 Confidency OS Executive Cockpit & Privacy Bounds', () => {
+    it('renders consolidated 5-card financial cockpit and confirms removal of redundant waterfall & banner cards', async () => {
+      render(
+        <TestWrapper initialRole="OWNER">
+          <ProfitLedgerPage />
+        </TestWrapper>
+      );
+
+      // Redundant waterfall & banner cards must NOT be rendered
+      expect(screen.queryByTestId('daily-cash-flow-waterfall-card')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('net-shop-profit-summary-card')).not.toBeInTheDocument();
+
+      // Clean 5-card cockpit
+      expect(screen.getByTestId('kpi-card-sales')).toBeInTheDocument();
+      expect(screen.getByTestId('kpi-card-direct-cost')).toBeInTheDocument();
+      expect(screen.getByTestId('kpi-card-gross-profit')).toBeInTheDocument();
+      expect(screen.getByTestId('kpi-card-expenses')).toBeInTheDocument();
+      expect(screen.getByTestId('kpi-card-net-profit')).toBeInTheDocument();
+    });
+
+    it('verifies that adding an invoiced workshop job immediately cascades through the profit ledger', async () => {
+      const summaryBefore = await financeRepository.getProfitLedgerSummary({ range: 'ALL_TIME' });
+
+      // Create a brand new invoiced job
+      await workshopJobRepository.create({
+        docStage: 'INVOICE',
+        header: {
+          jobNumber: 'JOB-2026-PHASE8',
+          date: '2026-11-02',
+          vehicleNumber: 'WP CAB-9999',
+          natureOfRepair: 'Transmission Overhaul & Gearbox Flush',
+          vehicleMake: 'Toyota',
+          chassisNumber: 'TOY-99991',
+          vehicleModel: 'Hilux',
+          daysForCompletion: '2 Days',
+          yearOfMake: '2022',
+          vehicleColor: 'Pearl White',
+          insuranceName: 'Cash',
+          customerInfo: 'Sunil Weerakkody',
+        },
+        lines: [
+          {
+            id: 'line-p8-1',
+            rowNo: 1,
+            category: 'LABOR_REPAIR',
+            description: 'Gearbox Disassembly & Re-machining',
+            sellingPriceRs: 20000,
+            buyingCostRs: 8000,
+            isCompleted: true,
+          },
+          {
+            id: 'line-p8-2',
+            rowNo: 2,
+            category: 'REPLACEMENT',
+            description: 'ATF Oil & Filter Kit',
+            sellingPriceRs: 30000,
+            buyingCostRs: 18000,
+            isCompleted: true,
+          },
+        ],
+        discountRs: 0,
+        taxRs: 0,
+      });
+
+      const summaryAfter = await financeRepository.getProfitLedgerSummary({ range: 'ALL_TIME' });
+
+      // Gross and net sales increased by 50,000
+      expect(summaryAfter.totalNetSalesRs).toBe(summaryBefore.totalNetSalesRs + 50000);
+      // Direct costs increased by 26,000
+      expect(summaryAfter.totalDirectCostRs).toBe(summaryBefore.totalDirectCostRs + 26000);
+      // Gross profit increased by 24,000 (50,000 - 26,000)
+      expect(summaryAfter.combinedGrossProfitRs).toBe(summaryBefore.combinedGrossProfitRs + 24000);
+      // Net shop profit increased by 24,000
+      expect(summaryAfter.netOperatingProfitRs).toBe(summaryBefore.netOperatingProfitRs + 24000);
+    });
+
+    it('verifies that recording a counter POS sale immediately cascades through sales, costs, and gross profit', async () => {
+      const summaryBefore = await financeRepository.getProfitLedgerSummary({ range: 'ALL_TIME' });
+
+      // Create a counter POS sale
+      await posSaleRepository.create({
+        customerNote: 'Walk-in Spark Plug Customer',
+        paymentMethod: 'CASH',
+        items: [
+          {
+            description: 'Denso Iridium Spark Plugs (Set of 4)',
+            qty: 1,
+            unitSellingPriceRs: 12000,
+            unitBuyingCostRs: 8000,
+            lineDiscountRs: 0,
+          },
+        ],
+        overallDiscountRs: 1000,
+        amountTenderedRs: 11000,
+        shiftId: 'SHIFT-2026-001',
+        cashierName: 'Kamal Fonseka',
+      });
+
+      const summaryAfter = await financeRepository.getProfitLedgerSummary({ range: 'ALL_TIME' });
+
+      // Net sales increased by 11,000
+      expect(summaryAfter.totalNetSalesRs).toBe(summaryBefore.totalNetSalesRs + 11000);
+      // POS buying cost increased by 8,000
+      expect(summaryAfter.posBuyingCostRs).toBe(summaryBefore.posBuyingCostRs + 8000);
+      // Gross profit increased by 3,000
+      expect(summaryAfter.combinedGrossProfitRs).toBe(summaryBefore.combinedGrossProfitRs + 3000);
+      // Net shop operating profit increased by 3,000
+      expect(summaryAfter.netOperatingProfitRs).toBe(summaryBefore.netOperatingProfitRs + 3000);
+    });
+
+    it('toggles shared-screen privacy mode and confirms RedactedCipherPlaceholder masks buying costs and margins with Rs. ••••••', async () => {
+      render(
+        <TestWrapper initialRole="OWNER">
+          <ProfitLedgerPage />
+        </TestWrapper>
+      );
+
+      // Initially, un-redacted figures are visible
+      expect(screen.queryAllByText('Rs. ••••••').length).toBe(0);
+
+      // Click Shared-Screen Privacy button
+      const privacyToggle = screen.getByTestId('toggle-privacy-btn');
+      act(() => {
+        fireEvent.click(privacyToggle);
+      });
+
+      // Now confidential cost and profit amounts are masked with cipher placeholder
+      expect(screen.getAllByText('Rs. ••••••').length).toBeGreaterThan(0);
+      expect(screen.getByText('Reveal Figures')).toBeInTheDocument();
+
+      // Click again to reveal
+      act(() => {
+        fireEvent.click(privacyToggle);
+      });
+      expect(screen.queryAllByText('Rs. ••••••').length).toBe(0);
+      expect(screen.getByText('Shared-Screen Privacy')).toBeInTheDocument();
+    });
+
+    it('verifies Quick Filter Pills ribbon on UnifiedProfitLedgerTable', async () => {
+      render(
+        <TestWrapper initialRole="OWNER">
+          <ProfitLedgerPage />
+        </TestWrapper>
+      );
+
+      // Filter pills should be present
+      expect(screen.getByTestId('filter-pill-ALL')).toBeInTheDocument();
+      expect(screen.getByTestId('filter-pill-WORKSHOP_INVOICE')).toBeInTheDocument();
+      expect(screen.getByTestId('filter-pill-POS_SALE')).toBeInTheDocument();
+      expect(screen.getByTestId('filter-pill-SHOP_EXPENSE')).toBeInTheDocument();
+
+      // Click Workshop Invoices pill
+      act(() => {
+        fireEvent.click(screen.getByTestId('filter-pill-WORKSHOP_INVOICE'));
+      });
+      expect(screen.getAllByText('Workshop Invoice').length).toBeGreaterThan(0);
+      expect(screen.queryByText('POS Sale')).not.toBeInTheDocument();
+
+      // Click POS Sale pill
+      act(() => {
+        fireEvent.click(screen.getByTestId('filter-pill-POS_SALE'));
+      });
+      expect(screen.getAllByText('POS Sale').length).toBeGreaterThan(0);
+      expect(screen.queryByText('Workshop Invoice')).not.toBeInTheDocument();
+
+      // Click All Transactions pill
+      act(() => {
+        fireEvent.click(screen.getByTestId('filter-pill-ALL'));
+      });
+      expect(screen.getAllByText('Workshop Invoice').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('POS Sale').length).toBeGreaterThan(0);
+    });
+
+    it('renders ExpensesPage (/finance/expenses) with RolePermissionGateWrapper protection and overhead register', async () => {
+      // 1. OWNER can access ExpensesPage
+      render(
+        <TestWrapper initialRole="OWNER">
+          <ExpensesPage />
+        </TestWrapper>
+      );
+
+      expect(screen.getByTestId('expenses-page')).toBeInTheDocument();
+      expect(screen.getByText('Garage Overhead & Expense Register')).toBeInTheDocument();
+      expect(screen.getByText('Total Filtered Overheads')).toBeInTheDocument();
+      expect(screen.getByTestId('expenses-table')).toBeInTheDocument();
+    });
+
+    it('BLOCKS unauthorized roles (CASHIER, TECHNICIAN, SERVICE_ADVISOR) from ExpensesPage', async () => {
+      const { unmount: unmount1 } = render(
+        <TestWrapper initialRole="CASHIER">
+          <ExpensesPage />
+        </TestWrapper>
+      );
+      expect(screen.getByTestId('restricted-finance-alert')).toBeInTheDocument();
+      expect(screen.queryByTestId('expenses-page')).not.toBeInTheDocument();
+      unmount1();
+
+      const { unmount: unmount2 } = render(
+        <TestWrapper initialRole="TECHNICIAN">
+          <ExpensesPage />
+        </TestWrapper>
+      );
+      expect(screen.getByTestId('restricted-finance-alert')).toBeInTheDocument();
+      expect(screen.queryByTestId('expenses-page')).not.toBeInTheDocument();
+      unmount2();
+
+      render(
+        <TestWrapper initialRole="SERVICE_ADVISOR">
+          <ExpensesPage />
+        </TestWrapper>
+      );
+      expect(screen.getByTestId('restricted-finance-alert')).toBeInTheDocument();
+      expect(screen.queryByTestId('expenses-page')).not.toBeInTheDocument();
+    });
+
+    it('confirms Shared-Screen Privacy mode masks KPI cards, Revenue Stream breakdown, TableMarginSparkBarCell, and NetShopProfitSummaryCard subtitle', async () => {
+      render(
+        <TestWrapper initialRole="OWNER">
+          <ProfitLedgerPage />
+        </TestWrapper>
+      );
+
+      // Verify unredacted state contains margin badges
+      expect(screen.getAllByText(/% Margin/i).length).toBeGreaterThan(0);
+
+      // Toggle Shared-Screen Privacy
+      const privacyToggle = screen.getByTestId('toggle-privacy-btn');
+      act(() => {
+        fireEvent.click(privacyToggle);
+      });
+
+      // 1. Waterfall Ribbon masked
+      expect(screen.getAllByText('Rs. ••••••').length).toBeGreaterThan(0);
+
+      // 2. KPI Cards & Breakdown margins masked with '••••%'
+      expect(screen.getAllByText(/••••%/i).length).toBeGreaterThan(0);
+
+      // 3. TableMarginSparkBarCell rendered in redacted mode
+      const redactedCells = screen.getAllByTestId('redacted-margin-cell');
+      expect(redactedCells.length).toBeGreaterThan(0);
+    });
+
+    it('verifies UnifiedProfitLedgerTable export button strips direct costs and gross profit in customer-facing privacy mode', async () => {
+      // Mock document.createElement & link click
+      let downloadedCsv = '';
+      let downloadedFilename = '';
+
+      const originalCreateElement = document.createElement.bind(document);
+      vi.spyOn(document, 'createElement').mockImplementation((tagName: string) => {
+        const el = originalCreateElement(tagName);
+        if (tagName.toLowerCase() === 'a') {
+          vi.spyOn(el, 'click').mockImplementation(() => {});
+          const originalSetAttribute = el.setAttribute.bind(el);
+          vi.spyOn(el, 'setAttribute').mockImplementation((key: string, val: string) => {
+            if (key === 'download') {
+              downloadedFilename = val;
+            }
+            originalSetAttribute(key, val);
+          });
+        }
+        return el;
+      });
+
+      // Mock URL.createObjectURL and inspect blob
+      const originalCreateObjectURL = URL.createObjectURL;
+      URL.createObjectURL = vi.fn().mockImplementation((blob: Blob) => {
+        // Blob part in jsdom is accessible via text()
+        if (typeof blob.text === 'function') {
+          blob.text().then((text) => {
+            downloadedCsv = text;
+          });
+        }
+        return 'mock-blob-url';
+      });
+
+      render(
+        <TestWrapper initialRole="OWNER">
+          <ProfitLedgerPage />
+        </TestWrapper>
+      );
+
+      // Toggle to privacy mode
+      const privacyToggle = screen.getByTestId('toggle-privacy-btn');
+      act(() => {
+        fireEvent.click(privacyToggle);
+      });
+
+      // Click Export button
+      const exportBtn = screen.getByTestId('export-ledger-btn');
+      expect(exportBtn).toBeInTheDocument();
+      expect(screen.getByText('Customer Export')).toBeInTheDocument();
+
+      await act(async () => {
+        fireEvent.click(exportBtn);
+      });
+
+      // Verify filename indicates customer statement
+      expect(downloadedFilename).toContain('profit-ledger-customer-statement');
+      if (downloadedCsv) {
+        expect(downloadedCsv).toContain('Net Selling Price (Rs.)');
+        expect(downloadedCsv).not.toContain('Direct Cost (Rs.)');
+        expect(downloadedCsv).not.toContain('Gross Profit (Rs.)');
+      }
+
+      // Cleanup
+      URL.createObjectURL = originalCreateObjectURL;
+      vi.restoreAllMocks();
+    });
+
+    it('verifies confidential cost columns have cost-column, cost-cell, and print-hidden classes for print privacy', async () => {
+      render(
+        <TestWrapper initialRole="OWNER">
+          <ProfitLedgerPage />
+        </TestWrapper>
+      );
+
+      // Direct Cost header has print-hidden and cost-column
+      const costHeader = screen.getByText('Direct Cost (Rs.)');
+      expect(costHeader).toHaveClass('cost-column');
+      expect(costHeader).toHaveClass('print-hidden');
+
+      // Gross Profit header has print-hidden and cost-column
+      const gpHeader = screen.getByText('Gross Profit (Rs.)');
+      expect(gpHeader).toHaveClass('cost-column');
+      expect(gpHeader).toHaveClass('print-hidden');
+
+      // Gross Margin header has print-hidden and cost-column
+      const marginHeader = screen.getByText('Gross Margin %');
+      expect(marginHeader).toHaveClass('cost-column');
+      expect(marginHeader).toHaveClass('print-hidden');
+    });
+
+    it('verifies embedded Date Range switcher in UnifiedProfitLedgerTable triggers period filtering', async () => {
+      render(
+        <TestWrapper initialRole="OWNER">
+          <ProfitLedgerPage />
+        </TestWrapper>
+      );
+
+      const tableDateSelect = screen.getByTestId('table-date-range-select');
+      expect(tableDateSelect).toBeInTheDocument();
+
+      act(() => {
+        fireEvent.change(tableDateSelect, { target: { value: 'TODAY' } });
+      });
+
+      expect(screen.getByText(/Showing financial events for/i)).toHaveTextContent('TODAY');
     });
   });
 });

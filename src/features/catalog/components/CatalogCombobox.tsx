@@ -292,7 +292,7 @@ export function CatalogCombobox({
             );
           })}
 
-          {/* Zero CRM friction: Custom free-form item entry */}
+          {/* Custom free-form item entry */}
           {onSelectCustom && query.trim() && (
             <div
               onClick={handleSelectCustom}

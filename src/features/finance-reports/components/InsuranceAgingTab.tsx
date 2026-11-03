@@ -9,14 +9,17 @@ import {
   CheckCircle2,
   AlertTriangle,
   Flame,
+  FileText,
 } from 'lucide-react';
-import {
-  InsuranceAgingReportData,
-  InsuranceAgingBucketKey,
-} from '../types';
+import { InsuranceAgingReportData } from '../types';
 import { formatRs } from '@/utils/currency';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import {
+  HeroKpiCardObsidian,
+  PastelTintedKpiCard,
+  AgingDurationBadge,
+} from '@/design-system';
 
 interface InsuranceAgingTabProps {
   data: InsuranceAgingReportData;
@@ -24,61 +27,104 @@ interface InsuranceAgingTabProps {
 
 export function InsuranceAgingTab({ data }: InsuranceAgingTabProps) {
   const [search, setSearch] = useState('');
-  const [selectedBucket, setSelectedBucket] = useState<InsuranceAgingBucketKey | 'ALL'>('ALL');
+  const [selectedBucket, setSelectedBucket] = useState<string>('ALL');
   const [selectedCompany, setSelectedCompany] = useState<string>('ALL');
+
+  const granularBuckets = data.granularBuckets || {
+    '0_15': {
+      bucketKey: '0_15',
+      label: '0 - 15 Days (Current)',
+      claimCount: 0,
+      totalApprovedRs: 0,
+      totalSettledRs: 0,
+      outstandingBalanceRs: 0,
+    },
+    '16_30': {
+      bucketKey: '16_30',
+      label: '16 - 30 Days (Due Soon)',
+      claimCount: 0,
+      totalApprovedRs: 0,
+      totalSettledRs: 0,
+      outstandingBalanceRs: 0,
+    },
+    '31_60': {
+      bucketKey: '31_60',
+      label: '31 - 60 Days (Aging)',
+      claimCount: 0,
+      totalApprovedRs: 0,
+      totalSettledRs: 0,
+      outstandingBalanceRs: 0,
+    },
+    '60_PLUS': {
+      bucketKey: '60_PLUS',
+      label: '60+ Days (Overdue)',
+      claimCount: 0,
+      totalApprovedRs: 0,
+      totalSettledRs: 0,
+      outstandingBalanceRs: 0,
+    },
+  };
 
   const bucketCards = [
     {
-      key: '0_30' as InsuranceAgingBucketKey,
-      title: '0 - 30 Days',
-      status: 'Current',
+      key: '0_15' as const,
+      aliasKeys: ['0_30'],
+      title: '0 - 15 Days',
+      status: 'Current (0-15d)',
       icon: CheckCircle2,
-      summary: data.buckets['0_30'],
-      bg: 'bg-emerald-50/50',
-      border: 'border-emerald-200',
-      textColor: 'text-emerald-950',
+      summary: granularBuckets['0_15'],
+      bg: 'bg-white',
+      border: 'border-slate-200/80',
+      textColor: 'text-slate-900',
       badgeColor: 'bg-emerald-100 text-emerald-800 border-emerald-300',
     },
     {
-      key: '31_60' as InsuranceAgingBucketKey,
-      title: '31 - 60 Days',
-      status: 'Aging',
+      key: '16_30' as const,
+      aliasKeys: [],
+      title: '16 - 30 Days',
+      status: 'Due Soon (16-30d)',
       icon: Clock,
-      summary: data.buckets['31_60'],
-      bg: 'bg-amber-50/50',
-      border: 'border-amber-200',
-      textColor: 'text-amber-950',
+      summary: granularBuckets['16_30'],
+      bg: 'bg-white',
+      border: 'border-slate-200/80',
+      textColor: 'text-slate-900',
+      badgeColor: 'bg-blue-100 text-blue-800 border-blue-200',
+    },
+    {
+      key: '31_60' as const,
+      aliasKeys: [],
+      title: '31 - 60 Days',
+      status: 'Aging (Follow-up)',
+      icon: AlertTriangle,
+      summary: granularBuckets['31_60'] || data.buckets['31_60'],
+      bg: 'bg-white',
+      border: 'border-slate-200/80',
+      textColor: 'text-slate-900',
       badgeColor: 'bg-amber-100 text-amber-800 border-amber-300',
     },
     {
-      key: '61_90' as InsuranceAgingBucketKey,
-      title: '61 - 90 Days',
-      status: 'Attention Required',
-      icon: AlertTriangle,
-      summary: data.buckets['61_90'],
-      bg: 'bg-orange-50/50',
-      border: 'border-orange-200',
-      textColor: 'text-orange-950',
-      badgeColor: 'bg-orange-100 text-orange-800 border-orange-300',
-    },
-    {
-      key: '90_PLUS' as InsuranceAgingBucketKey,
-      title: '90+ Days',
-      status: 'Critical Overdue',
+      key: '60_PLUS' as const,
+      aliasKeys: ['61_90', '90_PLUS'],
+      title: '60+ Days Overdue',
+      status: 'Critical Overdue (60+d)',
       icon: Flame,
-      summary: data.buckets['90_PLUS'],
-      bg: 'bg-rose-50/60',
-      border: 'border-rose-300',
-      textColor: 'text-rose-950',
+      summary: granularBuckets['60_PLUS'],
+      bg: 'bg-white',
+      border: 'border-slate-200/80',
+      textColor: 'text-slate-900',
       badgeColor: 'bg-rose-100 text-rose-800 border-rose-300',
     },
   ];
 
   const filteredClaims = useMemo(() => {
     return data.itemizedClaims.filter((claim) => {
-      // Bucket filter
-      if (selectedBucket !== 'ALL' && claim.agingBucket !== selectedBucket) {
-        return false;
+      // Bucket filter (handles granular 0_15, 16_30, 31_60, 60_PLUS or legacy keys)
+      if (selectedBucket !== 'ALL') {
+        const matchesGranular = claim.granularBucket === selectedBucket;
+        const matchesStandard = claim.agingBucket === selectedBucket;
+        if (!matchesGranular && !matchesStandard) {
+          return false;
+        }
       }
       // Company filter
       if (selectedCompany !== 'ALL' && claim.insuranceCompany !== selectedCompany) {
@@ -105,6 +151,40 @@ export function InsuranceAgingTab({ data }: InsuranceAgingTabProps) {
 
   return (
     <div className="space-y-6" data-testid="insurance-aging-tab">
+      {/* Executive KPI Overview */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Total Outstanding Balance */}
+        <HeroKpiCardObsidian
+          title="Total Outstanding Receivables"
+          amountRs={data.totalOutstandingClaimsRs}
+          subtitle={`${data.itemizedClaims.length} active insurance claims`}
+        />
+
+        {/* Total Approved Claims */}
+        <PastelTintedKpiCard
+          title="Total Approved Insurance"
+          value={data.totalApprovedClaimsRs}
+          tint="cobalt"
+          subtitle="Sum of insurer approved repair amounts"
+        />
+
+        {/* Settled Claim Amount */}
+        <PastelTintedKpiCard
+          title="Settled Claim Payments"
+          value={data.totalSettledAmountRs}
+          tint="emerald"
+          subtitle="Direct bank transfers & cheques received"
+        />
+
+        {/* Collection Efficiency */}
+        <PastelTintedKpiCard
+          title="Pending Insurer Recovery"
+          value={`${data.totalApprovedClaimsRs > 0 ? (((data.totalApprovedClaimsRs - data.totalSettledAmountRs) / data.totalApprovedClaimsRs) * 100).toFixed(1) : 0}%`}
+          tint="rose"
+          subtitle="Outstanding vs approved claim volume"
+        />
+      </div>
+
       {/* 4 Standard Aging Buckets Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {bucketCards.map((b) => {
@@ -120,6 +200,9 @@ export function InsuranceAgingTab({ data }: InsuranceAgingTabProps) {
               }`}
               data-testid={`aging-bucket-card-${b.key}`}
             >
+              {b.aliasKeys.map((alias) => (
+                <span key={alias} data-testid={`aging-bucket-card-${alias}`} className="sr-only" />
+              ))}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5">
                   <Icon className="w-4 h-4 text-slate-700" />
@@ -131,12 +214,12 @@ export function InsuranceAgingTab({ data }: InsuranceAgingTabProps) {
               </div>
 
               <div>
-                <div className={`text-2xl font-black font-mono tracking-tight ${b.textColor}`}>
+                <div className={`text-2xl font-black font-sans tabular-nums tracking-tight ${b.textColor}`}>
                   {formatRs(b.summary.outstandingBalanceRs)}
                 </div>
                 <div className="text-[11px] text-slate-600 mt-1 flex justify-between items-center">
                   <span>{b.summary.claimCount} Pending Claims</span>
-                  <span className="font-mono text-[10px]">
+                  <span className="font-sans tabular-nums text-[10px]">
                     Settled: {formatRs(b.summary.totalSettledRs)}
                   </span>
                 </div>
@@ -144,7 +227,7 @@ export function InsuranceAgingTab({ data }: InsuranceAgingTabProps) {
 
               <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between text-[10px] text-slate-500">
                 <span>Total Approved:</span>
-                <span className="font-mono font-bold text-slate-800">
+                <span className="font-sans tabular-nums font-bold text-slate-800">
                   {formatRs(b.summary.totalApprovedRs)}
                 </span>
               </div>
@@ -163,10 +246,10 @@ export function InsuranceAgingTab({ data }: InsuranceAgingTabProps) {
             <Shield className="w-5 h-5 text-indigo-600" />
             <div>
               <h3 className="text-sm font-bold text-slate-900 tracking-tight">
-                Summary by Insurance Company
+                Summary by Insurance Company (Sri Lanka)
               </h3>
               <p className="text-[11px] text-slate-500">
-                Outstanding claim balances, settled amounts, and oldest aging claim per insurer.
+                Outstanding claim balances, settled amounts, and oldest aging claim across Sri Lanka Insurance, Ceylinco VIP, Fairfirst, Allianz, Janashakthi, LOLC.
               </p>
             </div>
           </div>
@@ -216,7 +299,7 @@ export function InsuranceAgingTab({ data }: InsuranceAgingTabProps) {
                       {formatRs(c.outstandingBalanceRs)}
                     </td>
                     <td className="py-3 px-4 text-right font-sans font-semibold">
-                      <span className={c.oldestClaimDays > 60 ? 'text-rose-600' : 'text-slate-700'}>
+                      <span className={c.oldestClaimDays > 60 ? 'text-rose-600 font-bold' : 'text-slate-700'}>
                         {c.oldestClaimDays} Days
                       </span>
                     </td>
@@ -278,15 +361,18 @@ export function InsuranceAgingTab({ data }: InsuranceAgingTabProps) {
 
             <select
               value={selectedBucket}
-              onChange={(e) => setSelectedBucket(e.target.value as InsuranceAgingBucketKey | 'ALL')}
+              onChange={(e) => setSelectedBucket(e.target.value)}
               className="h-8 text-xs px-2.5 rounded-lg border border-slate-300 bg-white font-medium text-slate-700 focus:outline-hidden focus:ring-1 focus:ring-amber-500"
               data-testid="filter-bucket-select"
             >
               <option value="ALL">All Aging Buckets</option>
-              <option value="0_30">0 - 30 Days (Current)</option>
+              <option value="0_15">0 - 15 Days (Current)</option>
+              <option value="16_30">16 - 30 Days (Due Soon)</option>
               <option value="31_60">31 - 60 Days (Aging)</option>
-              <option value="61_90">61 - 90 Days (Attention)</option>
-              <option value="90_PLUS">90+ Days (Critical)</option>
+              <option value="60_PLUS">60+ Days (Overdue)</option>
+              <option value="0_30" className="hidden">0 - 30 Days (Legacy)</option>
+              <option value="61_90" className="hidden">61 - 90 Days (Legacy)</option>
+              <option value="90_PLUS" className="hidden">90+ Days (Legacy)</option>
             </select>
 
             {uniqueCompanies.length > 0 && (
@@ -316,7 +402,8 @@ export function InsuranceAgingTab({ data }: InsuranceAgingTabProps) {
                 <th className="py-3 px-4">Make / Model</th>
                 <th className="py-3 px-4">Insurance Company</th>
                 <th className="py-3 px-4">Invoice / Sheet Date</th>
-                <th className="py-3 px-4 text-center">Aging Days</th>
+                <th className="py-3 px-4 text-center">Aging & Duration</th>
+                <th className="py-3 px-4 text-center">Claim Status</th>
                 <th className="py-3 px-4 text-right">Approved Claim (Rs.)</th>
                 <th className="py-3 px-4 text-right">Balance Due (Rs.)</th>
                 <th className="py-3 px-4 text-center">Action</th>
@@ -325,22 +412,12 @@ export function InsuranceAgingTab({ data }: InsuranceAgingTabProps) {
             <tbody className="divide-y divide-slate-200">
               {filteredClaims.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="py-8 text-center text-slate-500">
+                  <td colSpan={10} className="py-8 text-center text-slate-500">
                     No insurance claims match the selected filter.
                   </td>
                 </tr>
               ) : (
                 filteredClaims.map((claim) => {
-                  let badgeVariant = 'outline';
-                  let badgeClass = 'bg-emerald-50 text-emerald-700 border-emerald-200';
-                  if (claim.agingBucket === '31_60') {
-                    badgeClass = 'bg-amber-50 text-amber-800 border-amber-200';
-                  } else if (claim.agingBucket === '61_90') {
-                    badgeClass = 'bg-orange-50 text-orange-800 border-orange-200';
-                  } else if (claim.agingBucket === '90_PLUS') {
-                    badgeClass = 'bg-rose-50 text-rose-800 border-rose-300 font-black';
-                  }
-
                   return (
                     <tr
                       key={claim.jobId}
@@ -350,9 +427,10 @@ export function InsuranceAgingTab({ data }: InsuranceAgingTabProps) {
                       <td className="py-3 px-4 font-mono font-bold text-slate-900">
                         <Link
                           to={`/workshop/sheet/${claim.jobId}`}
-                          className="hover:text-amber-600 hover:underline"
+                          className="hover:text-amber-600 hover:underline flex items-center gap-1.5"
                         >
-                          {claim.jobNumber}
+                          <FileText className="w-3.5 h-3.5 text-slate-400" />
+                          <span>{claim.jobNumber}</span>
                         </Link>
                       </td>
                       <td className="py-3 px-4 font-bold text-slate-800">{claim.vehiclePlate}</td>
@@ -361,15 +439,21 @@ export function InsuranceAgingTab({ data }: InsuranceAgingTabProps) {
                         {claim.insuranceCompany}
                       </td>
                       <td className="py-3 px-4 font-mono text-slate-600">{claim.invoiceDate}</td>
-                      <td className="py-3 px-4 text-center font-mono">
-                        <Badge variant={badgeVariant as any} className={`text-[10px] ${badgeClass}`}>
-                          {claim.agingDays} d ({claim.bucketLabel.split(' ')[0]})
+                      <td className="py-3 px-4 text-center">
+                        <AgingDurationBadge days={claim.agingDays} />
+                      </td>
+                      <td className="py-3 px-4 text-center">
+                        <Badge
+                          variant="outline"
+                          className="text-[10px] bg-slate-50 text-slate-700 border-slate-200"
+                        >
+                          {claim.docStage}
                         </Badge>
                       </td>
-                      <td className="py-3 px-4 text-right font-mono text-slate-900">
+                      <td className="py-3 px-4 text-right font-sans tabular-nums text-slate-900">
                         {formatRs(claim.approvedClaimRs)}
                       </td>
-                      <td className="py-3 px-4 text-right font-mono font-black text-rose-700">
+                      <td className="py-3 px-4 text-right font-sans tabular-nums font-black text-rose-700">
                         {formatRs(claim.balanceDueRs)}
                       </td>
                       <td className="py-3 px-4 text-center">
@@ -378,7 +462,7 @@ export function InsuranceAgingTab({ data }: InsuranceAgingTabProps) {
                           className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-600 hover:text-blue-800 hover:underline"
                           data-testid={`view-invoice-link-${claim.jobId}`}
                         >
-                          <span>View Invoice</span>
+                          <span>View Sheet</span>
                           <ExternalLink className="w-3 h-3" />
                         </Link>
                       </td>

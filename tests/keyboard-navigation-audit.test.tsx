@@ -1,12 +1,15 @@
 import { useState } from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
-import { describe, it, expect } from 'vitest';
+import { render, screen, fireEvent, act } from '@testing-library/react';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import { WorkshopTable } from '@/components/workshop/WorkshopTable';
 import { Header } from '@/app/layout/Header';
 import { AuthProvider } from '@/app/providers/AuthProvider';
 import { ToastProvider } from '@/components/ui/toast';
 import { WorkshopLineItem } from '@/types';
+import { PosTerminalPage } from '@/features/pos/pages/PosTerminalPage';
+import { catalogRepository } from '@/features/catalog/repository/catalog.repository.mock';
+import { posShiftRepository } from '@/features/pos/repository/pos-shift.repository.mock';
 
 function WorkshopTableTestHarness({
   initialItems,
@@ -198,4 +201,54 @@ describe('Keyboard Navigation & Usability Audit', () => {
       expect(document.activeElement).toBe(searchInput);
     });
   });
+
+  describe('4. POS Barcode Scanning Without Focus Traps', () => {
+    beforeEach(async () => {
+      localStorage.clear();
+      await catalogRepository.resetToDefaults();
+      await posShiftRepository.resetToDefaults();
+    });
+
+    it('operates hardware barcode scanner listener without trapping normal typing or active inputs', async () => {
+      await act(async () => {
+        render(
+          <MemoryRouter>
+            <AuthProvider initialRole="OWNER">
+              <ToastProvider>
+                <PosTerminalPage />
+              </ToastProvider>
+            </AuthProvider>
+          </MemoryRouter>
+        );
+      });
+
+      // 1. Verify barcode input is present and navigable
+      const barcodeInput = screen.getByTestId('pos-barcode-input');
+      expect(barcodeInput).toBeInTheDocument();
+
+      // 2. Typing into an active input shouldn't trigger background scanner buffer
+      barcodeInput.focus();
+      expect(document.activeElement).toBe(barcodeInput);
+      fireEvent.change(barcodeInput, { target: { value: 'FLT-DEN-C110' } });
+      expect(barcodeInput).toHaveValue('FLT-DEN-C110');
+
+      // 3. Clear barcode input and blur it to test background scanning without focus
+      fireEvent.change(barcodeInput, { target: { value: '' } });
+      barcodeInput.blur();
+      expect(document.activeElement).not.toBe(barcodeInput);
+
+      // Rapid keypresses simulating USB barcode scanner for FLT-DEN-C110 (barcode: 8901234567891)
+      const barcodeChars = '8901234567891'.split('');
+      await act(async () => {
+        for (const char of barcodeChars) {
+          window.dispatchEvent(new KeyboardEvent('keydown', { key: char, bubbles: true }));
+        }
+        window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+      });
+
+      // Verify item was added to cart seamlessly without focus trap
+      expect(screen.getByTestId('cart-count-badge')).toHaveTextContent('1 item');
+    });
+  });
 });
+

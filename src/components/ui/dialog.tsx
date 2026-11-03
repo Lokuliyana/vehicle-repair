@@ -26,14 +26,14 @@ export function Dialog({ open, onOpenChange, children, className }: DialogProps)
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 print:static print:p-0 print:block">
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black/50 backdrop-blur-xs transition-opacity no-print print:hidden"
+        className="fixed inset-0 bg-slate-950/25 backdrop-blur-md transition-opacity no-print print:hidden"
         onClick={() => onOpenChange(false)}
         aria-hidden="true"
       />
       {/* Container */}
       <div
         className={cn(
-          'relative z-50 w-full max-w-lg rounded-lg border border-slate-200 bg-white p-6 shadow-xl animate-in fade-in-0 zoom-in-95 print:border-none print:shadow-none print:p-0 print:m-0 print:max-w-none print:static',
+          'relative z-50 w-full max-w-lg rounded-[22px] border border-white/40 bg-white p-6 shadow-2xl animate-in fade-in-0 zoom-in-95 print:border-none print:shadow-none print:p-0 print:m-0 print:max-w-none print:static',
           className
         )}
       >

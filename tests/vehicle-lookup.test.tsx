@@ -7,6 +7,8 @@ import {
 } from '@/features/workshop/repository/vehicle-history.repository.mock';
 import { VehicleLookupInput } from '@/features/workshop/components/VehicleLookupInput';
 import { VehicleHistoricalRecord } from '@/features/workshop/types';
+import { SmartPlateAutocompleteInput } from '@/design-system/components/workshop-engine-components';
+import { VehicleHistoryLookupPopover } from '@/design-system/components/overlays-modals';
 
 describe('Smart Vehicle Plate History Lookup', () => {
   let repo: MockVehicleHistoryRepository;
@@ -245,6 +247,54 @@ describe('Smart Vehicle Plate History Lookup', () => {
       const matchSriSinhala = await repo.lookupByPlate('5 ශ්‍රී 4567');
       expect(matchSriSinhala.length).toBe(1);
       expect(matchSriSinhala[0].vehicleNumber).toBe('5 Sri 4567');
+    });
+
+    it('renders SmartPlateAutocompleteInput and triggers selection callback', () => {
+      const selectSpy = vi.fn();
+      const changeSpy = vi.fn();
+      render(
+        <SmartPlateAutocompleteInput
+          value="WP-KD"
+          onChange={changeSpy}
+          onSelectSuggestion={selectSpy}
+          suggestions={['WP-KD-9011', 'WP-KD-9012']}
+        />
+      );
+
+      const input = screen.getByTestId('smart-plate-autocomplete-input');
+      expect(input).toHaveValue('WP-KD');
+
+      // Click suggestion
+      const suggestionBtn = screen.getByText('WP-KD-9011');
+      fireEvent.click(suggestionBtn);
+      expect(selectSpy).toHaveBeenCalledWith('WP-KD-9011');
+
+      // Change input
+      fireEvent.change(input, { target: { value: 'cba' } });
+      expect(changeSpy).toHaveBeenCalledWith('CBA');
+    });
+
+    it('renders VehicleHistoryLookupPopover and applies auto-fill on click', () => {
+      const applySpy = vi.fn();
+      render(
+        <VehicleHistoryLookupPopover
+          plateNumber="WP CBA-1234"
+          foundVehicle={{
+            make: 'Toyota',
+            model: 'Corolla Axio',
+            year: '2018',
+            customerName: 'Nimal Perera',
+          }}
+          onApply={applySpy}
+        />
+      );
+
+      expect(screen.getByText(/Found Past History \(WP CBA-1234\):/i)).toBeInTheDocument();
+      expect(screen.getByText(/Toyota Corolla Axio \(2018\) • Nimal Perera/i)).toBeInTheDocument();
+
+      const autoFillBtn = screen.getByRole('button', { name: /Auto-Fill/i });
+      fireEvent.click(autoFillBtn);
+      expect(applySpy).toHaveBeenCalledTimes(1);
     });
   });
 });

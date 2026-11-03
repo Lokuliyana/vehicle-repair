@@ -1,0 +1,240 @@
+/**
+ * DNS Import & Export ERP — Global Design Tokens
+ * 500 Labs Master Design System Architecture
+ *
+ * Single Source of Truth for:
+ * 1. Semantic color tokens (app-bg, surface, primary terracotta, obsidian, borders, semantic pastels)
+ * 2. Typography tokens (display, page-title, section-title, body, table, tabular numerals)
+ * 3. 4px-based spacing scale (4, 8, 12, 16, 20, 24, 32, 40, 48, 64px)
+ * 4. Concentric radius tokens (sm: 4px, default: 8px, control: 10px, lg: 12px, card: 16px, modal: 20px, pill: 9999px)
+ * 5. Restrained elevation & shadow tokens (flat, raised, surface, floating, modal)
+ * 6. Component density standards (compact, standard, comfortable)
+ * 7. Standardized interaction states (hover, focus-visible, active, disabled)
+ */
+
+:root {
+  /* ==========================================================================
+     1. COLOUR TOKENS
+     ========================================================================== */
+  
+  /* Primary Action & Brand Accent */
+  --color-primary: #F95700;
+  --color-primary-hover: #EA580C;
+  --color-primary-light: #FFF7ED;
+  --color-primary-active: #C2410C;
+  --color-primary-foreground: #FFFFFF;
+
+  /* Obsidian Executive & Structural Anchor */
+  --color-obsidian: #0F172A;
+  --color-obsidian-hover: #1E293B;
+  --color-obsidian-surface: #18181B;
+  --color-obsidian-foreground: #FFFFFF;
+
+  /* Surfaces & Canvas Layering */
+  --color-app-bg: #F6F8FA;
+  --color-app-bg-warm: #F9F8F6;
+  --color-surface: #FFFFFF;
+  --color-surface-muted: #F8FAFC;
+  --color-surface-subtle: #F1F5F9;
+  --color-table-header: #FFF7ED;
+  --color-table-header-cool: #F8FAFC;
+
+  /* Structural Dividers & Hairlines */
+  --color-border: rgba(15, 23, 42, 0.08);
+  --color-border-subtle: rgba(15, 23, 42, 0.05);
+  --color-border-strong: rgba(15, 23, 42, 0.16);
+  --color-border-focus: #F95700;
+
+  /* Text & Editorial Hierarchy */
+  --color-text-primary: #0F172A;
+  --color-text-secondary: #475569;
+  --color-text-muted: #94A3B8;
+  --color-text-inverse: #FFFFFF;
+
+  /* Semantic Tonal Pastels: Success (Emerald) */
+  --color-success: #059669;
+  --color-success-bg: #ECFDF5;
+  --color-success-border: #A7F3D0;
+  --color-success-text: #047857;
+
+  /* Semantic Tonal Pastels: Warning / In-Review (Amber) */
+  --color-warning: #D97706;
+  --color-warning-bg: #FFFBEB;
+  --color-warning-border: #FDE68A;
+  --color-warning-text: #B45309;
+
+  /* Semantic Tonal Pastels: Danger / Error / Deficit (Crimson) */
+  --color-danger: #DC2626;
+  --color-danger-bg: #FEF2F2;
+  --color-danger-border: #FECACA;
+  --color-danger-text: #B91C1C;
+
+  /* Semantic Tonal Pastels: Info / Progress (Cobalt) */
+  --color-info: #2563EB;
+  --color-info-bg: #EFF6FF;
+  --color-info-border: #BFDBFE;
+  --color-info-text: #1D4ED8;
+
+  /* Internal Admin & Privacy Tints */
+  --color-admin-profit-tint: #F0FDF4;
+  --color-admin-profit-border: #BBF7D0;
+  --color-overlay-scrim: rgba(15, 23, 42, 0.45);
+
+  /* Legacy Backward Compatibility Mappings */
+  --bg-canvas: var(--color-app-bg);
+  --bg-canvas-warm: var(--color-app-bg-warm);
+  --bg-surface-primary: var(--color-surface);
+  --bg-surface-subtle: var(--color-surface-muted);
+  --bg-table-header: var(--color-table-header);
+  --brand-terracotta: var(--color-primary);
+  --brand-terracotta-hover: var(--color-primary-hover);
+  --brand-obsidian: var(--color-obsidian);
+  --admin-profit-tint: var(--color-admin-profit-tint);
+  --border-hairline: var(--color-border);
+  --border-focus: var(--color-border-focus);
+
+  /* ==========================================================================
+     2. TYPOGRAPHY TOKENS
+     ========================================================================== */
+  --font-sans: 'Plus Jakarta Sans', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  /* Typography Sizing & Hierarchy Scale */
+  --text-display: 2rem;            /* 32px - Executive Hero KPI */
+  --leading-display: 2.25rem;
+  --tracking-display: -0.03em;
+
+  --text-page-title: 1.5rem;       /* 24px - Canonical PageHeader */
+  --leading-page-title: 1.875rem;
+  --tracking-page-title: -0.015em;
+
+  --text-section-title: 1.125rem;  /* 18px - Card / Table Group Header */
+  --leading-section-title: 1.5rem;
+  --tracking-section-title: -0.01em;
+
+  --text-card-title: 0.875rem;     /* 14px - Metric Tile Title */
+  --leading-card-title: 1.25rem;
+  --tracking-card-title: 0.025em;
+
+  --text-body: 0.875rem;           /* 14px - Primary Body Copy */
+  --leading-body: 1.25rem;
+
+  --text-body-secondary: 0.8125rem;/* 13px - Secondary Supporting Copy */
+  --leading-body-secondary: 1.125rem;
+
+  --text-label: 0.75rem;           /* 12px - Form Field Labels */
+  --leading-label: 1rem;
+
+  --text-table-header: 0.6875rem;  /* 11px - Uppercase Table Headers */
+  --leading-table-header: 1rem;
+  --tracking-table-header: 0.05em;
+
+  --text-table-body: 0.8125rem;    /* 13px - Data Table Cells */
+  --leading-table-body: 1.125rem;
+
+  --text-caption: 0.6875rem;       /* 11px - Micro Tooltips & Timestamps */
+  --leading-caption: 0.875rem;
+
+  /* ==========================================================================
+     3. 4PX-BASED SPACING TOKENS
+     ========================================================================== */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  /* ==========================================================================
+     4. RADIUS TOKENS (Concentric Geometry)
+     ========================================================================== */
+  --radius-xs: 2px;
+  --radius-sm: 4px;                /* Inner chips, micro-kbd hotkeys */
+  --radius-default: 8px;           /* Standard inputs, sub-items */
+  --radius-control: 10px;          /* Buttons, form inputs, steppers */
+  --radius-lg: 12px;               /* Inner card panels, drawers */
+  --radius-card: 16px;             /* KPI cards, repair section containers, tables */
+  --radius-modal: 20px;            /* Floating dialogs, payment modal */
+  --radius-pill: 9999px;           /* Status badges, category tabs, count pills */
+
+  /* ==========================================================================
+     5. ELEVATION & SHADOW TOKENS
+     ========================================================================== */
+  --elevation-flat: none;
+  --elevation-raised: 0 1px 2px rgba(15, 23, 42, 0.04);
+  --elevation-surface: 0 2px 10px -2px rgba(15, 23, 42, 0.03), 0 12px 32px -4px rgba(15, 23, 42, 0.02);
+  --elevation-floating: 0 8px 30px rgba(15, 23, 42, 0.08), 0 2px 8px rgba(15, 23, 42, 0.04);
+  --elevation-modal: 0 20px 40px -8px rgba(15, 23, 42, 0.20), 0 0 0 1px rgba(15, 23, 42, 0.06);
+
+  /* ==========================================================================
+     6. COMPONENT DENSITY CONFIGURATION
+     ========================================================================== */
+  /* Compact: POS, Stock Balance, Financial Registers, High-Density Tables */
+  --density-compact-table-row: 40px;
+  --density-compact-cell-py: 6px;
+  --density-compact-cell-px: 10px;
+  --density-compact-input-h: 34px;
+  --density-compact-button-h: 32px;
+
+  /* Standard: Normal Operational Pages, Repair Sheet, Forms */
+  --density-standard-table-row: 48px;
+  --density-standard-cell-py: 10px;
+  --density-standard-cell-px: 14px;
+  --density-standard-input-h: 40px;
+  --density-standard-button-h: 38px;
+
+  /* Comfortable: Executive Dashboards, Overview Cards, Analytics Panels */
+  --density-comfortable-table-row: 56px;
+  --density-comfortable-cell-py: 14px;
+  --density-comfortable-cell-px: 16px;
+  --density-comfortable-input-h: 44px;
+  --density-comfortable-button-h: 42px;
+
+  /* ==========================================================================
+     7. STANDARDIZED INTERACTION STATES
+     ========================================================================== */
+  --state-hover-tint: rgba(15, 23, 42, 0.04);
+  --state-focus-ring: 0 0 0 3px rgba(249, 87, 0, 0.15);
+  --state-focus-border: #F95700;
+  --state-active-scale: 0.98;
+  --state-disabled-opacity: 0.45;
+}
+
+/* ==========================================================================
+   UTILITY CLASSES EXPOSING CENTRAL DESIGN TOKENS
+   ========================================================================== */
+.tabular-numbers,
+.display-figure {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+.surface-card {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--elevation-surface);
+}
+
+.surface-raised {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--elevation-raised);
+}
+
+.surface-floating {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--elevation-floating);
+}
+
+.surface-modal {
+  background-color: var(--color-surface);
+  border-radius: var(--radius-modal);
+  box-shadow: var(--elevation-modal);
+}

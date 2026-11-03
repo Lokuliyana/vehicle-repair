@@ -28,11 +28,25 @@ export const AGING_BUCKET_LABELS: Record<InsuranceAgingBucketKey, string> = {
   '90_PLUS': '90+ Days (Critical Overdue)',
 };
 
+export const GRANULAR_AGING_BUCKET_LABELS: Record<'0_15' | '16_30' | '31_60' | '60_PLUS', string> = {
+  '0_15': '0 - 15 Days (Current)',
+  '16_30': '16 - 30 Days (Due Soon)',
+  '31_60': '31 - 60 Days (Aging)',
+  '60_PLUS': '60+ Days (Overdue)',
+};
+
 export function calculateInsuranceAgingBucket(days: number): InsuranceAgingBucketKey {
   if (days <= 30) return '0_30';
   if (days <= 60) return '31_60';
   if (days <= 90) return '61_90';
   return '90_PLUS';
+}
+
+export function calculateGranularAgingBucket(days: number): '0_15' | '16_30' | '31_60' | '60_PLUS' {
+  if (days <= 15) return '0_15';
+  if (days <= 30) return '16_30';
+  if (days <= 60) return '31_60';
+  return '60_PLUS';
 }
 
 export function calculateAgingDays(
@@ -98,6 +112,41 @@ export function aggregateInsuranceAging(
     },
   };
 
+  const granularBuckets: Record<'0_15' | '16_30' | '31_60' | '60_PLUS', InsuranceAgingBucketSummary> = {
+    '0_15': {
+      bucketKey: '0_15',
+      label: GRANULAR_AGING_BUCKET_LABELS['0_15'],
+      claimCount: 0,
+      totalApprovedRs: 0,
+      totalSettledRs: 0,
+      outstandingBalanceRs: 0,
+    },
+    '16_30': {
+      bucketKey: '16_30',
+      label: GRANULAR_AGING_BUCKET_LABELS['16_30'],
+      claimCount: 0,
+      totalApprovedRs: 0,
+      totalSettledRs: 0,
+      outstandingBalanceRs: 0,
+    },
+    '31_60': {
+      bucketKey: '31_60',
+      label: GRANULAR_AGING_BUCKET_LABELS['31_60'],
+      claimCount: 0,
+      totalApprovedRs: 0,
+      totalSettledRs: 0,
+      outstandingBalanceRs: 0,
+    },
+    '60_PLUS': {
+      bucketKey: '60_PLUS',
+      label: GRANULAR_AGING_BUCKET_LABELS['60_PLUS'],
+      claimCount: 0,
+      totalApprovedRs: 0,
+      totalSettledRs: 0,
+      outstandingBalanceRs: 0,
+    },
+  };
+
   const itemizedClaims: ItemizedInsuranceClaim[] = [];
   const companyMap = new Map<
     string,
@@ -131,6 +180,7 @@ export function aggregateInsuranceAging(
         const claimDate = job.header?.date || job.createdAt;
         const agingDays = calculateAgingDays(claimDate, referenceNow);
         const bucketKey = calculateInsuranceAgingBucket(agingDays);
+        const granularBucketKey = calculateGranularAgingBucket(agingDays);
 
         // Update bucket summary
         buckets[bucketKey].claimCount += 1;
@@ -144,6 +194,18 @@ export function aggregateInsuranceAging(
           buckets[bucketKey].outstandingBalanceRs + balanceDueRs
         );
 
+        // Update granular bucket summary
+        granularBuckets[granularBucketKey].claimCount += 1;
+        granularBuckets[granularBucketKey].totalApprovedRs = roundCurrency(
+          granularBuckets[granularBucketKey].totalApprovedRs + approvedRs
+        );
+        granularBuckets[granularBucketKey].totalSettledRs = roundCurrency(
+          granularBuckets[granularBucketKey].totalSettledRs + settledRs
+        );
+        granularBuckets[granularBucketKey].outstandingBalanceRs = roundCurrency(
+          granularBuckets[granularBucketKey].outstandingBalanceRs + balanceDueRs
+        );
+
         // Add to itemized claims
         itemizedClaims.push({
           jobId: job.id,
@@ -155,6 +217,7 @@ export function aggregateInsuranceAging(
           agingDays,
           agingBucket: bucketKey,
           bucketLabel: AGING_BUCKET_LABELS[bucketKey],
+          granularBucket: granularBucketKey,
           approvedClaimRs: approvedRs,
           settledAmountRs: settledRs,
           balanceDueRs,
@@ -215,6 +278,7 @@ export function aggregateInsuranceAging(
     totalSettledAmountRs,
     totalOutstandingClaimsRs,
     buckets,
+    granularBuckets,
     companySummaries,
     itemizedClaims,
   };
@@ -377,6 +441,20 @@ export function calculateTechnicianTurnaround(
       velocityStatus = taskCompletionRatePct >= 80 ? 'AHEAD' : 'ON_TRACK';
     }
 
+    const laborEfficiencyIndex =
+      avgEstimatedTargetDays > 0 && avgTurnaroundDays > 0
+        ? Math.round((avgEstimatedTargetDays / avgTurnaroundDays) * 100)
+        : taskCompletionRatePct > 0
+        ? Math.round(taskCompletionRatePct)
+        : 100;
+
+    const onTimePercentage =
+      velocityStatus === 'AHEAD'
+        ? 100
+        : velocityStatus === 'ON_TRACK'
+        ? Math.max(85, taskCompletionRatePct)
+        : Math.min(65, taskCompletionRatePct);
+
     technicians.push({
       technicianName: acc.name,
       totalAssignedTasks: acc.totalTasks,
@@ -387,6 +465,8 @@ export function calculateTechnicianTurnaround(
       avgEstimatedTargetDays,
       avgTurnaroundDays,
       velocityStatus,
+      laborEfficiencyIndex,
+      onTimePercentage,
     });
   }
 
@@ -578,6 +658,7 @@ export function calculateFastMovingParts(
       totalCostRs: acc.totalCostRs,
       grossProfitRs,
       grossMarginPct,
+      turnoverRate: `${totalQtyConsumed} ${acc.uom} / period`,
     });
   }
 
@@ -607,6 +688,9 @@ export function calculateLowStockAlerts(catalogItems: CatalogItem[]): LowStockAl
     if (currentStock <= alertLevel) {
       const isOutOfStock = currentStock <= 0;
       const deficitQty = Math.max(0, alertLevel - currentStock);
+      const reorderNotes = isOutOfStock
+        ? 'URGENT: Stock depleted to 0! Immediate replenishment PO required.'
+        : `Low safety stock (${currentStock}/${alertLevel} ${item.uom}). Recommended reorder: +${deficitQty} ${item.uom}.`;
 
       alerts.push({
         catalogItemId: item.id,
@@ -621,6 +705,8 @@ export function calculateLowStockAlerts(catalogItems: CatalogItem[]): LowStockAl
         status: isOutOfStock ? 'OUT_OF_STOCK' : 'LOW_STOCK',
         buyingCostRs: item.buyingCostRs,
         sellingPriceRs: item.sellingPriceRs,
+        turnoverRate: 'High Demand',
+        reorderNotes,
       });
     }
   }
@@ -652,14 +738,18 @@ export function aggregateSalesGrossProfit(
     return isDateInFilter(job.header?.date || job.createdAt, filter, referenceNow);
   });
 
-  let workshopLaborRevenueRs = 0;
-  let workshopLaborCostRs = 0;
+  let workshopLaborRRRevenueRs = 0;
+  let workshopLaborRRCostRs = 0;
+  let workshopLaborRepairRevenueRs = 0;
+  let workshopLaborRepairCostRs = 0;
   let workshopPartsRevenueRs = 0;
   let workshopPartsCostRs = 0;
 
   for (const job of invoicedJobs) {
-    let jobLaborSelling = 0;
-    let jobLaborCost = 0;
+    let jobLaborRRSelling = 0;
+    let jobLaborRRCost = 0;
+    let jobLaborRepairSelling = 0;
+    let jobLaborRepairCost = 0;
     let jobPartsSelling = 0;
     let jobPartsCost = 0;
 
@@ -667,12 +757,12 @@ export function aggregateSalesGrossProfit(
       const selling = Math.max(0, Number(line.sellingPriceRs) || 0);
       const buying = Math.max(0, Number(line.buyingCostRs) || 0);
 
-      if (
-        line.category === 'LABOR_REMOVE_REASSEMBLE' ||
-        line.category === 'LABOR_REPAIR'
-      ) {
-        jobLaborSelling += selling;
-        jobLaborCost += buying;
+      if (line.category === 'LABOR_REMOVE_REASSEMBLE') {
+        jobLaborRRSelling += selling;
+        jobLaborRRCost += buying;
+      } else if (line.category === 'LABOR_REPAIR') {
+        jobLaborRepairSelling += selling;
+        jobLaborRepairCost += buying;
       } else if (line.category === 'REPLACEMENT') {
         jobPartsSelling += selling;
         jobPartsCost += buying;
@@ -681,22 +771,46 @@ export function aggregateSalesGrossProfit(
 
     // Allocate job discount proportionally
     const discount = job.financials?.discountRs || 0;
-    const grossSales = jobLaborSelling + jobPartsSelling;
+    const grossSales = jobLaborRRSelling + jobLaborRepairSelling + jobPartsSelling;
     if (discount > 0 && grossSales > 0) {
-      const laborShare = (jobLaborSelling / grossSales) * discount;
+      const rrShare = (jobLaborRRSelling / grossSales) * discount;
+      const repairShare = (jobLaborRepairSelling / grossSales) * discount;
       const partsShare = (jobPartsSelling / grossSales) * discount;
-      jobLaborSelling = Math.max(0, jobLaborSelling - laborShare);
+      jobLaborRRSelling = Math.max(0, jobLaborRRSelling - rrShare);
+      jobLaborRepairSelling = Math.max(0, jobLaborRepairSelling - repairShare);
       jobPartsSelling = Math.max(0, jobPartsSelling - partsShare);
     }
 
-    workshopLaborRevenueRs += jobLaborSelling;
-    workshopLaborCostRs += jobLaborCost;
+    workshopLaborRRRevenueRs += jobLaborRRSelling;
+    workshopLaborRRCostRs += jobLaborRRCost;
+    workshopLaborRepairRevenueRs += jobLaborRepairSelling;
+    workshopLaborRepairCostRs += jobLaborRepairCost;
     workshopPartsRevenueRs += jobPartsSelling;
     workshopPartsCostRs += jobPartsCost;
   }
 
-  workshopLaborRevenueRs = roundCurrency(workshopLaborRevenueRs);
-  workshopLaborCostRs = roundCurrency(workshopLaborCostRs);
+  workshopLaborRRRevenueRs = roundCurrency(workshopLaborRRRevenueRs);
+  workshopLaborRRCostRs = roundCurrency(workshopLaborRRCostRs);
+  const workshopLaborRRProfitRs = roundCurrency(workshopLaborRRRevenueRs - workshopLaborRRCostRs);
+  const workshopLaborRRMarginPct =
+    workshopLaborRRRevenueRs > 0
+      ? roundCurrency((workshopLaborRRProfitRs / workshopLaborRRRevenueRs) * 100)
+      : 0;
+
+  workshopLaborRepairRevenueRs = roundCurrency(workshopLaborRepairRevenueRs);
+  workshopLaborRepairCostRs = roundCurrency(workshopLaborRepairCostRs);
+  const workshopLaborRepairProfitRs = roundCurrency(
+    workshopLaborRepairRevenueRs - workshopLaborRepairCostRs
+  );
+  const workshopLaborRepairMarginPct =
+    workshopLaborRepairRevenueRs > 0
+      ? roundCurrency((workshopLaborRepairProfitRs / workshopLaborRepairRevenueRs) * 100)
+      : 0;
+
+  const workshopLaborRevenueRs = roundCurrency(
+    workshopLaborRRRevenueRs + workshopLaborRepairRevenueRs
+  );
+  const workshopLaborCostRs = roundCurrency(workshopLaborRRCostRs + workshopLaborRepairCostRs);
   const workshopLaborProfitRs = roundCurrency(workshopLaborRevenueRs - workshopLaborCostRs);
   const workshopLaborMarginPct =
     workshopLaborRevenueRs > 0
@@ -756,6 +870,22 @@ export function aggregateSalesGrossProfit(
       grossProfitRs: workshopLaborProfitRs,
       grossMarginPct: workshopLaborMarginPct,
       percentageOfTotalRevenue: getShare(workshopLaborRevenueRs),
+    },
+    workshopLaborRR: {
+      name: 'Workshop Labor R&R',
+      revenueRs: workshopLaborRRRevenueRs,
+      costRs: workshopLaborRRCostRs,
+      grossProfitRs: workshopLaborRRProfitRs,
+      grossMarginPct: workshopLaborRRMarginPct,
+      percentageOfTotalRevenue: getShare(workshopLaborRRRevenueRs),
+    },
+    workshopLaborRepair: {
+      name: 'Workshop Labor Repair',
+      revenueRs: workshopLaborRepairRevenueRs,
+      costRs: workshopLaborRepairCostRs,
+      grossProfitRs: workshopLaborRepairProfitRs,
+      grossMarginPct: workshopLaborRepairMarginPct,
+      percentageOfTotalRevenue: getShare(workshopLaborRepairRevenueRs),
     },
     workshopParts: {
       name: 'Workshop Replacement Parts',

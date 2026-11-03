@@ -1,5 +1,5 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import { AuthProvider } from '@/app/providers/AuthProvider';
 import { ToastProvider } from '@/components/ui/toast';
@@ -9,12 +9,32 @@ import { ReportsPage } from '@/features/finance-reports/pages/ReportsPage';
 import { analyticsRepository } from '@/features/finance-reports/repository/analytics.repository.mock';
 import {
   calculateInsuranceAgingBucket,
+  calculateGranularAgingBucket,
   calculateAgingDays,
   aggregateInsuranceAging,
   calculateTechnicianTurnaround,
   calculateFastMovingParts,
   calculateLowStockAlerts,
+  aggregateSalesGrossProfit,
 } from '@/features/finance-reports/utils/analytics-math';
+import {
+  buildSalesProfitCsv,
+  buildInsuranceAgingCsv,
+  buildTechnicianVelocityCsv,
+  buildInventoryAlertsCsv,
+  sanitizeReportDataForCustomer,
+} from '@/features/finance-reports/utils/report-exporter';
+import {
+  HeroKpiCardObsidian,
+  PastelTintedKpiCard,
+  SmoothedBezierAreaChart,
+  HeroHighlightBarChart,
+  MultiSegmentDonutChart,
+  TechnicianEfficiencyScorecard,
+  PopularPartsRankedListCard,
+  LowStockAlertTickerCard,
+  AgingDurationBadge,
+} from '@/design-system';
 import { workshopJobRepository } from '@/features/workshop/repository/workshop-job.repository.mock';
 import { posSaleRepository } from '@/features/pos/repository/pos-sale.repository.mock';
 import { catalogRepository } from '@/features/catalog/repository/catalog.repository.mock';
@@ -1235,4 +1255,713 @@ describe('Phase 9: Reports & Analytics Dashboards', () => {
       expect(Number.isNaN(report.overallAvgTurnaroundDays)).toBe(false);
     });
   });
+
+  // =========================================================================
+  // 8. 4-Stream Sales & Gross Profit Breakdown
+  // =========================================================================
+  describe('8. 4-Stream Sales & Gross Profit Breakdown (Labor R&R vs Repair vs Parts vs POS)', () => {
+    it('accurately segregates Workshop Labor R&R from Labor Repair and combines with Replacement Parts and POS', () => {
+      const sampleJobs: WorkshopJobSheet[] = [
+        {
+          id: 'job-4stream-1',
+          jobNumber: 'JOB-2026-4S1',
+          docStage: 'INVOICE',
+          floorStatus: 'COMPLETED_DELIVERED',
+          paymentStatus: 'PAID',
+          header: {
+            date: '2026-11-02',
+            jobNumber: 'JOB-2026-4S1',
+            vehicleNumber: 'WP CAB-1000',
+            natureOfRepair: 'Collision Overhaul',
+            vehicleMake: 'Toyota',
+            chassisNumber: 'CH-4S1',
+            vehicleModel: 'Premio',
+            daysForCompletion: '5 Days',
+            yearOfMake: '2020',
+            vehicleColor: 'Pearl White',
+            insuranceName: 'Sri Lanka Insurance (SLIC)',
+            customerInfo: 'Kasun',
+          },
+          lines: [
+            {
+              id: 'l-rr-1',
+              rowNo: 1,
+              category: 'LABOR_REMOVE_REASSEMBLE',
+              description: 'Front Bumper R&R',
+              sellingPriceRs: 10000,
+              buyingCostRs: 2000,
+              isCompleted: true,
+            },
+            {
+              id: 'l-rep-1',
+              rowNo: 2,
+              category: 'LABOR_REPAIR',
+              description: 'Dent Beating & 2K Paint',
+              sellingPriceRs: 25000,
+              buyingCostRs: 5000,
+              isCompleted: true,
+            },
+            {
+              id: 'l-part-1',
+              rowNo: 3,
+              category: 'REPLACEMENT',
+              description: 'OEM Headlamp Assembly',
+              sellingPriceRs: 35000,
+              buyingCostRs: 20000,
+              isCompleted: true,
+            },
+          ],
+          financials: {
+            subtotalRemoveReassembleRs: 10000,
+            subtotalRepairRs: 25000,
+            subtotalReplacementRs: 35000,
+            discountRs: 0,
+            taxRs: 0,
+            grandTotalSalesRs: 70000,
+            totalBuyingCostRs: 27000,
+            grossProfitRs: 43000,
+            grossMarginPct: 61.43,
+            insuranceApprovedRs: 70000,
+            customerPayableRs: 0,
+            advancePaidRs: 0,
+            balanceDueRs: 70000,
+          },
+          payments: [],
+          createdAt: '2026-11-02T08:00:00Z',
+          updatedAt: '2026-11-02T16:00:00Z',
+        },
+      ];
+
+      const samplePosSales: PosSaleTransaction[] = [
+        {
+          id: 'pos-4s-1',
+          receiptNumber: 'POS-2026-4S',
+          shiftId: 'SHIFT-1',
+          cashierName: 'Sunil',
+          date: '2026-11-02',
+          customerNote: 'Retail counter',
+          items: [
+            {
+              id: 'pos-it-1',
+              catalogItemId: 'cat-coolant',
+              sku: 'CLT-01',
+              description: 'Toyota Long Life Coolant',
+              category: 'Fluids',
+              qty: 2,
+              unitSellingPriceRs: 6000,
+              unitBuyingCostRs: 4000,
+              lineDiscountRs: 0,
+              lineTotalSalesRs: 12000,
+              lineTotalCostRs: 8000,
+              lineGrossProfitRs: 4000,
+            },
+          ],
+          subtotalSalesRs: 12000,
+          overallDiscountRs: 0,
+          netSalesRs: 12000,
+          totalBuyingCostRs: 8000,
+          grossProfitRs: 4000,
+          grossMarginPct: 33.33,
+          paymentMethod: 'CASH',
+          amountTenderedRs: 12000,
+          changeGivenRs: 0,
+          createdAt: '2026-11-02T12:00:00Z',
+        },
+      ];
+
+      const report = aggregateSalesGrossProfit(sampleJobs, samplePosSales, { range: 'ALL_TIME' });
+
+      // Verify Total Net Sales and Total Direct Cost
+      expect(report.totalNetSalesRs).toBe(70000 + 12000); // 82,000
+      expect(report.totalDirectCostRs).toBe(27000 + 8000); // 35,000
+      expect(report.combinedGrossProfitRs).toBe(82000 - 35000); // 47,000
+
+      // Verify Workshop Labor R&R stream
+      const rr = report.streams.workshopLaborRR;
+      expect(rr).toBeDefined();
+      expect(rr?.revenueRs).toBe(10000);
+      expect(rr?.costRs).toBe(2000);
+      expect(rr?.grossProfitRs).toBe(8000);
+      expect(rr?.grossMarginPct).toBe(80);
+
+      // Verify Workshop Labor Repair stream
+      const repair = report.streams.workshopLaborRepair;
+      expect(repair).toBeDefined();
+      expect(repair?.revenueRs).toBe(25000);
+      expect(repair?.costRs).toBe(5000);
+      expect(repair?.grossProfitRs).toBe(20000);
+      expect(repair?.grossMarginPct).toBe(80);
+
+      // Verify Workshop Parts Replacement stream
+      expect(report.streams.workshopParts.revenueRs).toBe(35000);
+      expect(report.streams.workshopParts.costRs).toBe(20000);
+      expect(report.streams.workshopParts.grossProfitRs).toBe(15000);
+
+      // Verify Counter POS stream
+      expect(report.streams.counterPosSales.revenueRs).toBe(12000);
+      expect(report.streams.counterPosSales.costRs).toBe(8000);
+      expect(report.streams.counterPosSales.grossProfitRs).toBe(4000);
+
+      // Total Labor = R&R + Repair
+      expect(report.streams.workshopLabor.revenueRs).toBe(35000);
+      expect(report.streams.workshopLabor.costRs).toBe(7000);
+      expect(report.streams.workshopLabor.grossProfitRs).toBe(28000);
+    });
+  });
+
+  // =========================================================================
+  // 9. Pending Insurance Claim Aging Granular Buckets & Insurers
+  // =========================================================================
+  describe('9. Granular Aging Buckets (0-15d, 16-30d, 31-60d, 60+d) & Insurers Grouping', () => {
+    it('correctly maps aging days into the 4 granular buckets', () => {
+      expect(calculateGranularAgingBucket(0)).toBe('0_15');
+      expect(calculateGranularAgingBucket(15)).toBe('0_15');
+      expect(calculateGranularAgingBucket(16)).toBe('16_30');
+      expect(calculateGranularAgingBucket(30)).toBe('16_30');
+      expect(calculateGranularAgingBucket(31)).toBe('31_60');
+      expect(calculateGranularAgingBucket(60)).toBe('31_60');
+      expect(calculateGranularAgingBucket(61)).toBe('60_PLUS');
+      expect(calculateGranularAgingBucket(120)).toBe('60_PLUS');
+    });
+
+    it('groups claims across major Sri Lankan insurance companies', () => {
+      const refDate = new Date(2026, 10, 2);
+      const sriLankanInsurers = [
+        'Sri Lanka Insurance (SLIC)',
+        'Ceylinco VIP',
+        'Fairfirst Insurance',
+        'Allianz Insurance Lanka',
+        'Janashakthi Insurance',
+        'LOLC General Insurance',
+      ];
+
+      const jobs: WorkshopJobSheet[] = sriLankanInsurers.map((insurer, idx) => ({
+        id: `job-ins-${idx}`,
+        jobNumber: `JOB-2026-INS${idx}`,
+        docStage: 'INVOICE',
+        floorStatus: 'COMPLETED_DELIVERED',
+        paymentStatus: 'UNPAID',
+        header: {
+          date: '2026-10-15',
+          jobNumber: `JOB-2026-INS${idx}`,
+          vehicleNumber: `WP CAR-${1000 + idx}`,
+          natureOfRepair: 'Body Repair',
+          vehicleMake: 'Toyota',
+          chassisNumber: `CH-INS-${idx}`,
+          vehicleModel: 'Corolla',
+          daysForCompletion: '3 Days',
+          yearOfMake: '2019',
+          vehicleColor: 'Silver',
+          insuranceName: insurer,
+          customerInfo: `Customer ${idx}`,
+        },
+        lines: [],
+        financials: {
+          subtotalRemoveReassembleRs: 0,
+          subtotalRepairRs: 0,
+          subtotalReplacementRs: 0,
+          discountRs: 0,
+          taxRs: 0,
+          grandTotalSalesRs: 50000,
+          totalBuyingCostRs: 25000,
+          grossProfitRs: 25000,
+          grossMarginPct: 50,
+          insuranceApprovedRs: 50000,
+          customerPayableRs: 0,
+          advancePaidRs: 0,
+          balanceDueRs: 0,
+        },
+        payments: [],
+        createdAt: '2026-10-15T08:00:00Z',
+        updatedAt: '2026-10-15T08:00:00Z',
+      }));
+
+      const report = aggregateInsuranceAging(jobs, refDate);
+
+      expect(report.companySummaries.length).toBe(6);
+      for (const insName of sriLankanInsurers) {
+        const found = report.companySummaries.find((c) => c.insuranceCompany === insName);
+        expect(found).toBeDefined();
+        expect(found?.claimCount).toBe(1);
+        expect(found?.outstandingBalanceRs).toBe(50000);
+      }
+      expect(report.totalOutstandingClaimsRs).toBe(300000);
+      expect(report.granularBuckets).toBeDefined();
+    });
+  });
+
+  // =========================================================================
+  // 10. Technician Efficiency Scorecard & Labor Efficiency Index
+  // =========================================================================
+  describe('10. Technician Turnaround & Floor Productivity Scorecard with Efficiency Index', () => {
+    it('calculates on-time percentage and labor efficiency index', () => {
+      const refDate = new Date(2026, 10, 2);
+      const jobs: WorkshopJobSheet[] = [
+        {
+          id: 'job-tech-eff-1',
+          jobNumber: 'JOB-2026-TE1',
+          docStage: 'INVOICE',
+          floorStatus: 'COMPLETED_DELIVERED',
+          paymentStatus: 'PAID',
+          header: {
+            date: '2026-10-28',
+            jobNumber: 'JOB-2026-TE1',
+            vehicleNumber: 'WP CAR-3333',
+            natureOfRepair: 'Fast Service',
+            vehicleMake: 'Honda',
+            chassisNumber: 'CH-TE1',
+            vehicleModel: 'Grace',
+            daysForCompletion: '4 Days', // Promised days
+            yearOfMake: '2018',
+            vehicleColor: 'White',
+            insuranceName: 'Ceylinco',
+            customerInfo: 'Rohan',
+          },
+          lines: [
+            {
+              id: 'l-te-1',
+              rowNo: 1,
+              category: 'LABOR_REPAIR',
+              description: 'Bumper beat',
+              sellingPriceRs: 15000,
+              buyingCostRs: 4000,
+              assignedTechnician: 'Priyantha Dias',
+              isCompleted: true,
+            },
+          ],
+          financials: {
+            subtotalRemoveReassembleRs: 0,
+            subtotalRepairRs: 15000,
+            subtotalReplacementRs: 0,
+            discountRs: 0,
+            taxRs: 0,
+            grandTotalSalesRs: 15000,
+            totalBuyingCostRs: 4000,
+            grossProfitRs: 11000,
+            grossMarginPct: 73.33,
+            insuranceApprovedRs: 0,
+            customerPayableRs: 15000,
+            advancePaidRs: 15000,
+            balanceDueRs: 0,
+          },
+          createdAt: '2026-10-28T08:00:00Z',
+          updatedAt: '2026-10-30T08:00:00Z', // Took 2 days vs 4 days promised!
+        },
+      ];
+
+      const report = calculateTechnicianTurnaround(jobs, refDate);
+      const tech = report.technicians.find((t) => t.technicianName === 'Priyantha Dias');
+
+      expect(tech).toBeDefined();
+      expect(tech?.completedJobsCount).toBe(1);
+      expect(tech?.avgEstimatedTargetDays).toBe(4);
+      expect(tech?.avgTurnaroundDays).toBe(2);
+      expect(tech?.velocityStatus).toBe('AHEAD');
+      // Labor Efficiency Index: Target / Actual * 100 = 4 / 2 * 100 = 200%
+      expect(tech?.laborEfficiencyIndex).toBe(200);
+      expect(tech?.onTimePercentage).toBe(100);
+    });
+
+    it('renders TechnicianEfficiencyScorecard component with expected progress bar and metrics', () => {
+      render(
+        <TechnicianEfficiencyScorecard
+          technicianName="Priyantha Dias"
+          completedJobsCount={12}
+          avgTurnaroundDays={2.5}
+          avgPromisedDays={4}
+          onTimePercentage={95}
+          laborEfficiencyIndex={160}
+          velocityStatus="AHEAD"
+        />
+      );
+
+      expect(screen.getByText('Priyantha Dias')).toBeInTheDocument();
+      expect(screen.getByText(/12 jobs completed/)).toBeInTheDocument();
+      expect(screen.getByText('95% On-time')).toBeInTheDocument();
+      expect(screen.getByText('160%')).toBeInTheDocument();
+      expect(screen.getByText(/Turnaround: 2.5d vs 4d target/)).toBeInTheDocument();
+    });
+  });
+
+  // =========================================================================
+  // 11. Popular Parts Ranked List & Low-Stock Alerts
+  // =========================================================================
+  describe('11. Fast-Moving Inventory Turnover & Low-Stock Replenishment Alerts', () => {
+    it('renders PopularPartsRankedListCard with ranking numbers, turnover rate, and units consumed', () => {
+      render(
+        <PopularPartsRankedListCard
+          title="Fast-Moving Inventory"
+          items={[
+            {
+              sku: 'FLT-001',
+              name: 'Engine Oil Filter C-110',
+              totalQtyConsumed: 18,
+              revenueRs: 32400,
+              turnoverRate: '18 pcs / period',
+            },
+            {
+              sku: 'BRK-002',
+              name: 'Front Ceramic Brake Pads',
+              totalQtyConsumed: 8,
+              revenueRs: 68000,
+              turnoverRate: '8 sets / period',
+            },
+          ]}
+        />
+      );
+
+      expect(screen.getByText('Fast-Moving Inventory')).toBeInTheDocument();
+      expect(screen.getByText('Engine Oil Filter C-110')).toBeInTheDocument();
+      expect(screen.getByText('FLT-001')).toBeInTheDocument();
+      expect(screen.getByText('18 pcs / period')).toBeInTheDocument();
+      expect(screen.getByText(/18 units consumed/)).toBeInTheDocument();
+      expect(screen.getByText('Front Ceramic Brake Pads')).toBeInTheDocument();
+    });
+
+    it('renders LowStockAlertTickerCard with reorder notes, deficit quantities, and restock actions', () => {
+      const onRestock = vi.fn();
+      render(
+        <LowStockAlertTickerCard
+          alerts={[
+            {
+              sku: 'OIL-5W30',
+              name: 'Toyota 5W-30 Motor Oil',
+              stockQty: 0,
+              minQty: 8,
+              deficitQty: 8,
+              reorderNotes: 'URGENT: Stock depleted to 0! Immediate replenishment PO required.',
+              status: 'OUT_OF_STOCK',
+            },
+            {
+              sku: 'FLT-002',
+              name: 'Cabin Air Filter',
+              stockQty: 2,
+              minQty: 5,
+              deficitQty: 3,
+              reorderNotes: 'Low safety stock (2/5 pcs).',
+              status: 'LOW_STOCK',
+            },
+          ]}
+          onQuickRestock={onRestock}
+        />
+      );
+
+      expect(screen.getByText(/Low Stock Alerts \(2\)/)).toBeInTheDocument();
+      expect(screen.getByText('Toyota 5W-30 Motor Oil')).toBeInTheDocument();
+      expect(screen.getByText(/Stock depleted to 0/)).toBeInTheDocument();
+      expect(screen.getByText('0 left (min: 8)')).toBeInTheDocument();
+
+      const restockBtn = screen.getByText('Quick Restock (+8)');
+      fireEvent.click(restockBtn);
+      expect(onRestock).toHaveBeenCalledWith('OIL-5W30');
+    });
+  });
+
+  // =========================================================================
+  // 12. Executive Visual Suite Components Zero NaN / Zero Division Hardening
+  // =========================================================================
+  describe('12. Executive Visual Suite Components Zero NaN / Zero Division Hardening', () => {
+    it('renders SmoothedBezierAreaChart with empty dataset or all zeroes without producing NaN', () => {
+      const { container } = render(
+        <SmoothedBezierAreaChart
+          title="Zero State Area Chart"
+          data={[]}
+        />
+      );
+
+      expect(screen.getByText('Zero State Area Chart')).toBeInTheDocument();
+      // Inspect all paths and points for NaN
+      const paths = container.querySelectorAll('path');
+      paths.forEach((p) => {
+        expect(p.getAttribute('d')).not.toContain('NaN');
+      });
+      const circles = container.querySelectorAll('circle');
+      circles.forEach((c) => {
+        expect(c.getAttribute('cx')).not.toBe('NaN');
+        expect(c.getAttribute('cy')).not.toBe('NaN');
+      });
+    });
+
+    it('renders HeroHighlightBarChart with zeroes and peak detection without NaN', () => {
+      const { container } = render(
+        <HeroHighlightBarChart
+          title="Zero Peak Distribution"
+          data={[
+            { label: 'Stream A', value: 0 },
+            { label: 'Stream B', value: 0 },
+          ]}
+        />
+      );
+
+      expect(screen.getByText('Zero Peak Distribution')).toBeInTheDocument();
+      const bars = container.querySelectorAll('[style*="height"]');
+      bars.forEach((b) => {
+        expect(b.getAttribute('style')).not.toContain('NaN');
+      });
+    });
+
+    it('renders MultiSegmentDonutChart with zero total without division-by-zero or NaN', () => {
+      const { container } = render(
+        <MultiSegmentDonutChart
+          segments={[
+            { label: 'Labor', value: 0, color: '#3B82F6' },
+            { label: 'Parts', value: 0, color: '#F95700' },
+          ]}
+          totalLabel="Total Sales"
+        />
+      );
+
+      expect(screen.getByText('Revenue Allocation')).toBeInTheDocument();
+      expect(screen.getAllByText('Total Sales').length).toBeGreaterThanOrEqual(1);
+      const circles = container.querySelectorAll('circle');
+      circles.forEach((c) => {
+        const strokeDash = c.getAttribute('stroke-dasharray');
+        if (strokeDash) {
+          expect(strokeDash).not.toContain('NaN');
+        }
+      });
+    });
+
+    it('renders AgingDurationBadge with distinct visual tiers', () => {
+      const { rerender } = render(<AgingDurationBadge days={5} />);
+      expect(screen.getByText(/5 Days \(0-15 Days\)/)).toBeInTheDocument();
+
+      rerender(<AgingDurationBadge days={22} />);
+      expect(screen.getByText(/22 Days \(16-30 Days\)/)).toBeInTheDocument();
+
+      rerender(<AgingDurationBadge days={45} />);
+      expect(screen.getByText(/45 Days \(31-60 Days\)/)).toBeInTheDocument();
+
+      rerender(<AgingDurationBadge days={95} />);
+      expect(screen.getByText(/95 Days \(60\+ Days Overdue\)/)).toBeInTheDocument();
+    });
+
+    it('renders HeroKpiCardObsidian and PastelTintedKpiCard with formatted numbers and badges', () => {
+      render(
+        <div>
+          <HeroKpiCardObsidian
+            title="Total Realized Revenue"
+            amountRs={1250000}
+            deltaPercent={14.8}
+            subtitle="Current cycle billings"
+          />
+          <PastelTintedKpiCard
+            title="Gross Margin Ratio"
+            value="42.5%"
+            tint="emerald"
+            subtitle="Target > 40%"
+          />
+        </div>
+      );
+
+      expect(screen.getByText('Total Realized Revenue')).toBeInTheDocument();
+      expect(screen.getByText(/1,250,000/)).toBeInTheDocument();
+      expect(screen.getByText('+14.8%')).toBeInTheDocument();
+      expect(screen.getByText('Gross Margin Ratio')).toBeInTheDocument();
+      expect(screen.getByText('42.5%')).toBeInTheDocument();
+    });
+  });
+
+  // =========================================================================
+  // 13. 1-Click CSV and PDF Export Privacy & Sanitization Auditing
+  // =========================================================================
+  describe('13. 1-Click CSV and PDF Export Privacy & Cost Sanitization Auditing', () => {
+    it('STRICTLY SANITIZES customer-facing Sales CSV, stripping internal buying costs and profit margins', () => {
+      const mockSalesData = analyticsRepository.getSalesGrossProfitReportSync({ range: 'THIS_MONTH' });
+
+      // 1. Customer-facing export
+      const customerExport = buildSalesProfitCsv(mockSalesData, true);
+      expect(customerExport.filename).toContain('Customer_Revenue_Summary');
+      const customerLines = customerExport.csvContent.toLowerCase();
+
+      // STRICT PRIVACY ASSERTIONS:
+      expect(customerLines).not.toContain('direct cost');
+      expect(customerLines).not.toContain('buying cost');
+      expect(customerLines).not.toContain('gross profit');
+      expect(customerLines).not.toContain('gross margin');
+      expect(customerLines).toContain('gross sales (lkr)');
+      expect(customerLines).toContain('revenue share %');
+
+      // 2. Executive management export
+      const execExport = buildSalesProfitCsv(mockSalesData, false);
+      expect(execExport.filename).toContain('Executive_Sales_Gross_Profit');
+      const execLines = execExport.csvContent.toLowerCase();
+
+      expect(execLines).toContain('direct cost (lkr)');
+      expect(execLines).toContain('gross profit (lkr)');
+      expect(execLines).toContain('gross margin %');
+    });
+
+    it('STRICTLY SANITIZES customer-facing Inventory Alerts CSV, eliminating internal unit buying costs', () => {
+      const mockInventoryData = analyticsRepository.getInventoryVelocityAndAlertsReportSync({ range: 'THIS_MONTH' });
+
+      const customerExport = buildInventoryAlertsCsv(mockInventoryData, true);
+      expect(customerExport.filename).toContain('Customer');
+      const customerContent = customerExport.csvContent.toLowerCase();
+
+      // Strict Customer Privacy:
+      expect(customerContent).not.toContain('buying cost');
+      expect(customerContent).not.toContain('gross profit');
+      expect(customerContent).not.toContain('margin %');
+      expect(customerContent).toContain('unit selling price (lkr)');
+      expect(customerContent).toContain('total selling revenue (lkr)');
+
+      const execExport = buildInventoryAlertsCsv(mockInventoryData, false);
+      const execContent = execExport.csvContent.toLowerCase();
+      expect(execContent).toContain('buying cost (lkr)');
+      expect(execContent).toContain('gross profit (lkr)');
+    });
+
+    it('builds Insurance Aging and Technician Velocity CSV exports correctly', () => {
+      const agingData = analyticsRepository.getInsuranceAgingReportSync();
+      const agingExport = buildInsuranceAgingCsv(agingData, false);
+      expect(agingExport.filename).toContain('Insurance_Claim_Aging');
+      expect(agingExport.csvContent).toContain('Insurance Company');
+      expect(agingExport.csvContent).toContain('Outstanding Balance (LKR)');
+
+      const techData = analyticsRepository.getTechnicianVelocityReportSync();
+      const techExport = buildTechnicianVelocityCsv(techData, false);
+      expect(techExport.filename).toContain('Technician_Productivity');
+      expect(techExport.csvContent).toContain('Technician');
+      expect(techExport.csvContent).toContain('Labor Efficiency Index');
+    });
+
+    it('purges all sensitive keys with sanitizeReportDataForCustomer utility', () => {
+      const sampleInternalRows = [
+        {
+          id: '1',
+          name: 'Brake Disc',
+          sellingPriceRs: 12000,
+          buyingCostRs: 7000,
+          directCostRs: 7000,
+          grossProfitRs: 5000,
+          marginPct: 41.67,
+        },
+      ];
+
+      const sanitized = sanitizeReportDataForCustomer(sampleInternalRows);
+
+      expect(sanitized[0].name).toBe('Brake Disc');
+      expect(sanitized[0].sellingPriceRs).toBe(12000);
+      expect(sanitized[0].buyingCostRs).toBeUndefined();
+      expect(sanitized[0].directCostRs).toBeUndefined();
+      expect(sanitized[0].grossProfitRs).toBeUndefined();
+      expect(sanitized[0].marginPct).toBeUndefined();
+    });
+
+    it('interacts with export controls on ReportsPage UI', async () => {
+      renderReportsApp('OWNER');
+
+      const exportCsvBtn = screen.getByTestId('export-csv-btn');
+      const exportPdfBtn = screen.getByTestId('export-pdf-btn');
+      const privacyToggle = screen.getByTestId('export-privacy-toggle');
+
+      expect(exportCsvBtn).toBeInTheDocument();
+      expect(exportPdfBtn).toBeInTheDocument();
+      expect(privacyToggle).toBeInTheDocument();
+      expect(screen.getByText('Executive Internal')).toBeInTheDocument();
+
+      // Toggle to Customer Sanitized
+      fireEvent.click(privacyToggle);
+      expect(screen.getByText('Customer Sanitized')).toBeInTheDocument();
+
+      // Click Export CSV
+      fireEvent.click(exportCsvBtn);
+      await waitFor(() => {
+        expect(screen.getByTestId('export-notification')).toBeInTheDocument();
+        expect(screen.getByText(/Sanitized Customer View/)).toBeInTheDocument();
+      });
+
+      // Click Export PDF and verify immediate user feedback
+      fireEvent.click(exportPdfBtn);
+      await waitFor(() => {
+        expect(screen.getByText(/Dispatched print preview dialog for PDF generation/)).toBeInTheDocument();
+      });
+    });
+  });
+
+  // =========================================================================
+  // 14. Deep Verification: 4-Stream Cards, Granular Buckets & Quick Restock
+  // =========================================================================
+  describe('14. Enhanced Executive Suite Components & Granular Verification', () => {
+    it('renders all 4 segregated stream cards in Sales & Gross Profit breakdown', () => {
+      renderReportsApp('OWNER');
+
+      expect(screen.getByTestId('stream-card-labor-rr')).toBeInTheDocument();
+      expect(screen.getByTestId('stream-card-labor-repair')).toBeInTheDocument();
+      expect(screen.getByTestId('stream-card-parts')).toBeInTheDocument();
+      expect(screen.getByTestId('stream-card-pos')).toBeInTheDocument();
+
+      // Check titles (found in cards and breakdown table)
+      expect(screen.getAllByText('Workshop Labor R&R').length).toBeGreaterThanOrEqual(1);
+      expect(screen.getAllByText('Workshop Labor Repair').length).toBeGreaterThanOrEqual(1);
+      expect(screen.getAllByText('Workshop Replacement Parts').length).toBeGreaterThanOrEqual(1);
+      expect(screen.getAllByText(/Counter.*POS Sales/).length).toBeGreaterThanOrEqual(1);
+    });
+
+    it('renders and filters by the 4 required granular aging buckets in Insurance Aging tab', () => {
+      renderReportsApp('OWNER');
+
+      fireEvent.click(screen.getByTestId('tab-btn-insurance-aging'));
+
+      // Check all 4 granular bucket cards
+      expect(screen.getByTestId('aging-bucket-card-0_15')).toBeInTheDocument();
+      expect(screen.getByTestId('aging-bucket-card-16_30')).toBeInTheDocument();
+      expect(screen.getByTestId('aging-bucket-card-31_60')).toBeInTheDocument();
+      expect(screen.getByTestId('aging-bucket-card-60_PLUS')).toBeInTheDocument();
+
+      // Click 0-15 card
+      fireEvent.click(screen.getByTestId('aging-bucket-card-0_15'));
+      expect(screen.getByTestId('itemized-claims-table')).toBeInTheDocument();
+
+      // Click 60_PLUS card
+      fireEvent.click(screen.getByTestId('aging-bucket-card-60_PLUS'));
+      expect(screen.getByTestId('itemized-claims-table')).toBeInTheDocument();
+    });
+
+    it('interacts with DateRangePickerAnalytics custom date range apply button', () => {
+      renderReportsApp('OWNER');
+
+      fireEvent.click(screen.getByTestId('filter-btn-custom'));
+
+      const customStart = screen.getByTestId('custom-start-date');
+      const customEnd = screen.getByTestId('custom-end-date');
+      const applyBtn = screen.getByTestId('apply-custom-dates-btn');
+
+      fireEvent.change(customStart, { target: { value: '2026-10-01' } });
+      fireEvent.change(customEnd, { target: { value: '2026-10-31' } });
+      fireEvent.click(applyBtn);
+
+      expect(screen.getByTestId('kpi-gross-revenue')).toBeInTheDocument();
+    });
+
+    it('renders quick restock action in LowStockAlertTickerCard', () => {
+      renderReportsApp('OWNER');
+
+      fireEvent.click(screen.getByTestId('tab-btn-inventory-alerts'));
+
+      expect(screen.getByTestId('low-stock-alert-ticker-card')).toBeInTheDocument();
+      // Verify quick restock elements exist (button or tag)
+      const restockElements = screen.getAllByText(/Quick Restock/);
+      expect(restockElements.length).toBeGreaterThan(0);
+    });
+
+    it('renders empty-state watermark in SmoothedBezierAreaChart when all data is zero', () => {
+      render(
+        <SmoothedBezierAreaChart
+          title="Zero Sales Period"
+          data={[
+            { label: 'Labor R&R', revenue: 0, profit: 0 },
+            { label: 'Labor Repair', revenue: 0, profit: 0 },
+          ]}
+        />
+      );
+
+      expect(screen.getByTestId('bezier-empty-state')).toBeInTheDocument();
+      expect(
+        screen.getByText('No revenue or profit activity recorded for this period')
+      ).toBeInTheDocument();
+    });
+  });
 });
+

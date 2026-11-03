@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import { AuthProvider } from '@/app/providers/AuthProvider';
@@ -153,11 +153,18 @@ describe('Application Shell & Navigation Layout', () => {
   });
 
   it('navigates to Phase 1 Interactive Bench route and renders 3-section table & print preview', () => {
-    renderTestApp(['/workshop/sheet/demo'], 'OWNER');
+    renderTestApp(['/workshop/sheet/demo?dev=true'], 'OWNER');
 
     expect(screen.getByTestId('interactive-bench-page')).toBeInTheDocument();
     expect(screen.getByText('1. Editable Workshop Tables (Keyboard Ready)')).toBeInTheDocument();
     expect(screen.getByText('2. A4 Workshop Print Preview')).toBeInTheDocument();
+  });
+
+  it('guarantees production repair sheet eliminates developer switcher row', () => {
+    renderTestApp(['/workshop/sheet/demo'], 'OWNER');
+
+    expect(screen.getByTestId('interactive-bench-page')).toBeInTheDocument();
+    expect(screen.queryByText('1. Editable Workshop Tables (Keyboard Ready)')).not.toBeInTheDocument();
   });
 
   it('navigates to 404 Not Found page on invalid route', () => {
@@ -319,3 +326,223 @@ describe('Protected Routes & Permission Enforcements', () => {
     expect(screen.getByTestId('profit-ledger-page')).toBeInTheDocument();
   });
 });
+
+describe('Phase 2 — Bonfol/CommerceOS App Shell, Sidebar Rail & Spotlight Command Palette', () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it('renders Sidebar with Workshop Branch Card, 4 grouped sections, and setup widget', () => {
+    renderTestApp(['/'], 'OWNER');
+
+    // Workshop Branch Card
+    expect(screen.getByText('500 Labs — Main Workshop')).toBeInTheDocument();
+    expect(screen.getByText(/4 Active Bays Operating/i)).toBeInTheDocument();
+
+    // 4 Grouped Section Titles
+    expect(screen.getByText('WORKSHOP')).toBeInTheDocument();
+    expect(screen.getByText('COUNTER POS')).toBeInTheDocument();
+    expect(screen.getByText('CATALOG')).toBeInTheDocument();
+    expect(screen.getByText('FINANCE & REPORTS')).toBeInTheDocument();
+
+    // Setup Checklist widget
+    expect(screen.getByText('Workshop Setup')).toBeInTheDocument();
+    expect(screen.getByText('6/7')).toBeInTheDocument();
+
+    // User Profile & Sidebar perspective switcher
+    expect(screen.getByTestId('sidebar-role-select')).toBeInTheDocument();
+  });
+
+  it('highlights active route item with soft coral styling', () => {
+    renderTestApp(['/workshop/jobs'], 'OWNER');
+
+    const activeLink = screen.getByTestId('nav-workshop-jobs');
+    expect(activeLink.className).toContain('bg-[#FFF3ED]');
+    expect(activeLink.className).toContain('text-[#F95700]');
+  });
+
+  it('renders top header with dynamic breadcrumbs and RolePerspectiveBadge', () => {
+    renderTestApp(['/workshop/jobs'], 'OWNER');
+
+    // Breadcrumbs for /workshop/jobs inside header
+    const header = screen.getByTestId('app-header');
+    expect(within(header).getByText('Workshop')).toBeInTheDocument();
+    expect(within(header).getByText('Job Cards')).toBeInTheDocument();
+
+    // RolePerspectiveBadge
+    const badge = screen.getByTestId('role-perspective-badge');
+    expect(badge).toBeInTheDocument();
+    expect(badge).toHaveTextContent('Owner / Director');
+    expect(badge).toHaveTextContent('Privileged');
+  });
+
+  it('updates RolePerspectiveBadge and breadcrumbs when navigating or switching roles', () => {
+    renderTestApp(['/pos'], 'OWNER');
+
+    // Breadcrumbs for /pos inside header
+    const header = screen.getByTestId('app-header');
+    expect(within(header).getByText('Counter POS')).toBeInTheDocument();
+    expect(within(header).getByText('Terminal')).toBeInTheDocument();
+
+    // Switch to SERVICE_ADVISOR
+    const headerRoleSelect = screen.getByTestId('role-switcher-select');
+    fireEvent.change(headerRoleSelect, { target: { value: 'SERVICE_ADVISOR' } });
+
+    const badge = screen.getByTestId('role-perspective-badge');
+    expect(badge).toHaveTextContent('Service Advisor');
+  });
+
+  it('opens Spotlight Command Palette when typing in global omnibox', () => {
+    renderTestApp(['/'], 'OWNER');
+
+    const searchInput = screen.getByTestId('global-search-input');
+    expect(screen.queryByTestId('spotlight-command-palette')).not.toBeInTheDocument();
+
+    // Type query
+    fireEvent.change(searchInput, { target: { value: 'CAB' } });
+
+    // Spotlight overlay should be visible
+    expect(screen.getByTestId('spotlight-command-palette')).toBeInTheDocument();
+    expect(screen.getByText('WP CAB-4521')).toBeInTheDocument();
+  });
+
+  it('filters Spotlight Command Palette by catalog SKU and closes on Escape', () => {
+    renderTestApp(['/'], 'OWNER');
+
+    const searchInput = screen.getByTestId('global-search-input');
+    fireEvent.change(searchInput, { target: { value: 'BMP' } });
+
+    expect(screen.getByTestId('spotlight-command-palette')).toBeInTheDocument();
+    expect(screen.getByText('PRT-TOY-BMP-F')).toBeInTheDocument();
+
+    // Escape closes spotlight
+    fireEvent.keyDown(searchInput, { key: 'Escape' });
+    expect(screen.queryByTestId('spotlight-command-palette')).not.toBeInTheDocument();
+  });
+
+  it('supports keyboard ArrowDown/ArrowUp and Enter navigation in Spotlight Command Palette', () => {
+    renderTestApp(['/'], 'OWNER');
+
+    const searchInput = screen.getByTestId('global-search-input');
+    fireEvent.change(searchInput, { target: { value: 'Counter POS' } });
+
+    expect(screen.getByTestId('spotlight-command-palette')).toBeInTheDocument();
+
+    // Press Enter to select
+    fireEvent.keyDown(searchInput, { key: 'Enter' });
+
+    // Should navigate to POS page
+    expect(screen.getByTestId('pos-terminal-page')).toBeInTheDocument();
+  });
+
+  it('ENFORCES PRIVACY BOUNDARIES: switching from OWNER to SERVICE_ADVISOR immediately unmounts buying cost toggle and metrics', () => {
+    renderTestApp(['/'], 'OWNER');
+
+    // Cost mode toggle visible for OWNER
+    expect(screen.getByTestId('header-cost-mode-toggle')).toBeInTheDocument();
+
+    // Switch role to SERVICE_ADVISOR
+    const roleSelect = screen.getByTestId('role-switcher-select');
+    fireEvent.change(roleSelect, { target: { value: 'SERVICE_ADVISOR' } });
+
+    // Invariant: Header toggle is unmounted
+    expect(screen.queryByTestId('header-cost-mode-toggle')).not.toBeInTheDocument();
+
+    // Invariant: Buying cost and gross profit metrics cannot appear
+    expect(screen.queryByText('Direct Buying Costs')).not.toBeInTheDocument();
+    expect(screen.queryByText('Gross Profit & Margin')).not.toBeInTheDocument();
+  });
+
+  it('ENFORCES PRIVACY BOUNDARIES: switching from OWNER to CASHIER or TECHNICIAN completely hides cost toggles', () => {
+    renderTestApp(['/'], 'OWNER');
+    expect(screen.getByTestId('header-cost-mode-toggle')).toBeInTheDocument();
+
+    const roleSelect = screen.getByTestId('role-switcher-select');
+
+    // Switch to CASHIER
+    fireEvent.change(roleSelect, { target: { value: 'CASHIER' } });
+    expect(screen.queryByTestId('header-cost-mode-toggle')).not.toBeInTheDocument();
+
+    // Switch to TECHNICIAN
+    fireEvent.change(roleSelect, { target: { value: 'TECHNICIAN' } });
+    expect(screen.queryByTestId('header-cost-mode-toggle')).not.toBeInTheDocument();
+    expect(screen.queryByText('Direct Buying Costs')).not.toBeInTheDocument();
+  });
+
+  it('opens Spotlight Command Palette when clicking mobile search trigger button', () => {
+    renderTestApp(['/'], 'OWNER');
+
+    const mobileSearchBtn = screen.getByTestId('mobile-search-trigger');
+    expect(screen.queryByTestId('spotlight-command-palette')).not.toBeInTheDocument();
+
+    fireEvent.click(mobileSearchBtn);
+    expect(screen.getByTestId('spotlight-command-palette')).toBeInTheDocument();
+  });
+
+  it('cycles perspective role when clicking RolePerspectiveBadge', () => {
+    renderTestApp(['/'], 'OWNER');
+
+    const badge = screen.getByTestId('role-perspective-badge');
+    expect(badge).toHaveTextContent('Owner / Director');
+
+    // Click 1: Owner -> Workshop Manager
+    fireEvent.click(badge);
+    expect(badge).toHaveTextContent('Workshop Manager');
+
+    // Click 2: Workshop Manager -> Service Advisor
+    fireEvent.click(badge);
+    expect(badge).toHaveTextContent('Service Advisor');
+
+    // Click 3: Service Advisor -> Cashier
+    fireEvent.click(badge);
+    expect(badge).toHaveTextContent('Cashier');
+
+    // Click 4: Cashier -> Technician
+    fireEvent.click(badge);
+    expect(badge).toHaveTextContent('Technician');
+
+    // Click 5: Technician -> Owner
+    fireEvent.click(badge);
+    expect(badge).toHaveTextContent('Owner / Director');
+  });
+
+  it('closes Spotlight Command Palette when pressing Escape on window even when search input is not active element', () => {
+    renderTestApp(['/'], 'OWNER');
+
+    const searchInput = screen.getByTestId('global-search-input');
+    fireEvent.change(searchInput, { target: { value: 'CAB' } });
+    expect(screen.getByTestId('spotlight-command-palette')).toBeInTheDocument();
+
+    // Blur search input so it is no longer the active element
+    searchInput.blur();
+    expect(document.activeElement).not.toBe(searchInput);
+
+    // Press Escape on window
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(screen.queryByTestId('spotlight-command-palette')).not.toBeInTheDocument();
+  });
+
+  it('clears search input query upon selecting an item in Spotlight Command Palette', () => {
+    renderTestApp(['/'], 'OWNER');
+
+    const searchInput = screen.getByTestId('global-search-input') as HTMLInputElement;
+    fireEvent.change(searchInput, { target: { value: 'CAB' } });
+    expect(searchInput.value).toBe('CAB');
+
+    // Press Enter to select first item
+    fireEvent.keyDown(searchInput, { key: 'Enter' });
+
+    // Should clear the input value for subsequent commands
+    expect(searchInput.value).toBe('');
+    expect(screen.queryByTestId('spotlight-command-palette')).not.toBeInTheDocument();
+  });
+
+  it('renders breadcrumb parent link with href allowing navigation back', () => {
+    renderTestApp(['/workshop/jobs'], 'OWNER');
+
+    const header = screen.getByTestId('app-header');
+    const workshopLink = within(header).getByRole('link', { name: 'Workshop' });
+    expect(workshopLink).toHaveAttribute('href', '/');
+  });
+});
+

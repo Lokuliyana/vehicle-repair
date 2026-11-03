@@ -64,6 +64,8 @@ describe('Catalog Privacy Invariants & Role Access', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId('catalog-cost-header')).toBeInTheDocument();
+      expect(screen.getByTestId('buying-cost-header')).toBeInTheDocument();
+      expect(screen.getByTestId('profit-header')).toBeInTheDocument();
       expect(screen.getByTestId('catalog-cost-PRT-TOY-BMP-F')).toBeInTheDocument();
     });
   });
@@ -79,6 +81,7 @@ describe('Catalog Privacy Invariants & Role Access', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId('catalog-cost-header')).toBeInTheDocument();
+      expect(screen.getByTestId('profit-header')).toBeInTheDocument();
     });
   });
 
@@ -96,6 +99,8 @@ describe('Catalog Privacy Invariants & Role Access', () => {
     });
 
     expect(screen.queryByTestId('catalog-cost-header')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('buying-cost-header')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('profit-header')).not.toBeInTheDocument();
     expect(screen.queryByTestId('catalog-cost-PRT-TOY-BMP-F')).not.toBeInTheDocument();
   });
 
@@ -114,6 +119,8 @@ describe('Catalog Privacy Invariants & Role Access', () => {
 
     // Both the header and cell MUST NOT exist in the DOM
     expect(screen.queryByTestId('catalog-cost-header')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('buying-cost-header')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('profit-header')).not.toBeInTheDocument();
     expect(screen.queryByTestId('catalog-cost-PRT-TOY-BMP-F')).not.toBeInTheDocument();
   });
 

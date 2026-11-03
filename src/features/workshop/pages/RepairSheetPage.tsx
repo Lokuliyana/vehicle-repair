@@ -5,16 +5,15 @@ import {
   Printer,
   Share2,
   Save,
-  ArrowLeft,
   Lock,
   RefreshCw,
-  Sparkles,
   Shield,
   Clock,
   CheckCircle2,
   FileCheck,
   CreditCard,
   Receipt,
+  Package,
 } from 'lucide-react';
 import {
   WorkshopJobSheet,
@@ -41,10 +40,12 @@ import { CatalogCombobox } from '@/features/catalog/components/CatalogCombobox';
 import { A4WorkshopPrint } from '@/components/print/A4WorkshopPrint';
 import { WorkshopPaymentThermalReceipt } from '@/components/print/WorkshopPaymentThermalReceipt';
 import { PaymentCollectionModal } from '../components/PaymentCollectionModal';
-import { buildWhatsAppShareUrl } from '@/utils/whatsapp';
+import { buildWhatsAppShareUrl, formatWhatsAppSummary } from '@/utils/whatsapp';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { PageContainer } from '@/components/layouts';
+import { PageHeader } from '@/components/ui/page-header';
 import {
   Dialog,
   DialogHeader,
@@ -54,6 +55,9 @@ import {
 } from '@/components/ui/dialog';
 import { useToast } from '@/components/ui/toast';
 import { cn } from '@/utils/cn';
+import { SwitchiOSTactile } from '@/design-system/components/form-inputs';
+import { WhatsAppSharePreviewDialog } from '@/design-system/components/overlays-modals';
+import { OriginalEstimateSnapshotDrawer } from '@/design-system/components/workshop-engine-components';
 
 const NATURE_OF_REPAIR_PRESETS = [
   'Accident Repair',
@@ -76,12 +80,13 @@ const INSURANCE_PRESETS = [
 export function RepairSheetPage() {
   const { id } = useParams<{ id?: string }>();
   const navigate = useNavigate();
-  const { role, user, permissions, isCostProfitVisible } = useAuth();
+  const { role, user, permissions, isCostProfitVisible, setCostProfitVisible } = useAuth();
   const { toast } = useToast();
 
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
+  const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState(false);
   const [currentId, setCurrentId] = useState<string | undefined>(id);
 
   // Core Job Sheet State
@@ -114,6 +119,7 @@ export function RepairSheetPage() {
   const [activeThermalPayment, setActiveThermalPayment] =
     useState<WorkshopPaymentRecord | null>(null);
   const [originalSnapshot, setOriginalSnapshot] = useState<string | undefined>();
+  const [isSnapshotDrawerOpen, setIsSnapshotDrawerOpen] = useState(false);
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
 
   // Fetch or initialize job sheet
@@ -559,16 +565,32 @@ export function RepairSheetPage() {
         shouldFreezeSnapshot ? ' Baseline estimate snapshot frozen.' : ''
       }`,
     };
-    setAuditLogs((prev) => [...prev, auditEntry]);
+    const updatedLogs = [...auditLogs, auditEntry];
+    setAuditLogs(updatedLogs);
 
     setDocStage(newStage);
 
     // Contextual floor status adjustment
+    let nextFloorStatus = floorStatus;
     if (newStage === 'JOB_CARD' && (floorStatus === 'DRAFT' || floorStatus === 'PENDING_INSURANCE_APPROVAL')) {
-      setFloorStatus('APPROVED_IN_PROGRESS');
+      nextFloorStatus = 'APPROVED_IN_PROGRESS';
+      setFloorStatus(nextFloorStatus);
     } else if (newStage === 'INVOICE') {
       const isPaid = dynamicPaymentStatus === 'PAID';
-      setFloorStatus(isPaid ? 'COMPLETED_DELIVERED' : 'READY_FOR_DELIVERY');
+      nextFloorStatus = isPaid ? 'COMPLETED_DELIVERED' : 'READY_FOR_DELIVERY';
+      setFloorStatus(nextFloorStatus);
+    }
+
+    if (currentId) {
+      workshopJobRepository.update(currentId, {
+        docStage: newStage,
+        floorStatus: nextFloorStatus,
+        paymentStatus: dynamicPaymentStatus,
+        originalEstimateSnapshot: snapshot,
+        auditLogs: updatedLogs,
+      }).catch((err) => {
+        console.error('Failed to sync stage conversion to repository:', err);
+      });
     }
 
     toast({
@@ -720,8 +742,13 @@ export function RepairSheetPage() {
   ]);
 
   const handleShareWhatsApp = () => {
+    setIsWhatsAppModalOpen(true);
+  };
+
+  const handleConfirmWhatsAppSend = () => {
     const url = buildWhatsAppShareUrl(activeJobSheet);
     window.open(url, '_blank', 'noopener,noreferrer');
+    setIsWhatsAppModalOpen(false);
   };
 
   const handleTriggerPrint = () => {
@@ -743,170 +770,192 @@ export function RepairSheetPage() {
   const isJobCardMode = docStage === 'JOB_CARD' || role === 'TECHNICIAN';
 
   return (
-    <div
-      className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 space-y-6"
-      data-testid="repair-sheet-page"
-    >
-      {/* Top Action & Navigation Bar */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-xs no-print">
-        <div className="flex items-center gap-3">
-          <Link to="/workshop/jobs">
-            <Button variant="ghost" size="sm" className="gap-1.5 text-slate-600">
-              <ArrowLeft className="w-4 h-4" />
-              <span>Jobs History</span>
-            </Button>
-          </Link>
-
-          <div className="h-4 w-px bg-slate-300 hidden sm:block" />
-
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-lg font-black text-slate-900 tracking-tight flex items-center gap-2">
-                <FileSpreadsheet className="w-5 h-5 text-amber-600" />
-                {currentId ? `Edit Sheet: ${jobNumber}` : `New Repair Sheet (${jobNumber})`}
-              </h1>
-              <Badge
-                variant={
-                  docStage === 'INVOICE'
-                    ? 'success'
-                    : docStage === 'JOB_CARD'
-                    ? 'info'
-                    : 'warning'
-                }
-                className="font-bold uppercase tracking-wider text-[10px]"
-                data-testid="sheet-stage-badge"
-              >
-                {docStage}
-              </Badge>
-              <Badge
-                variant={
-                  dynamicPaymentStatus === 'PAID'
-                    ? 'success'
-                    : dynamicPaymentStatus === 'PARTIALLY_PAID'
-                    ? 'warning'
-                    : 'destructive'
-                }
-                className="font-bold uppercase tracking-wider text-[10px]"
-                data-testid="sheet-payment-status-badge"
-              >
-                {dynamicPaymentStatus}
-              </Badge>
-            </div>
-            <p className="text-xs text-slate-500">
-              Zero-CRM high-speed collision estimation & workshop billing
-            </p>
+    <PageContainer maxWidth="wide" dataTestId="repair-sheet-page" className="pb-28">
+      {/* 1. Standardized Modern Bento Command Card Header */}
+      <PageHeader
+        glowColor="orange"
+        icon={<FileSpreadsheet className="w-5 h-5 text-[#F95700]" />}
+        iconClassName="bg-orange-50/80 border-orange-200/80 text-[#F95700]"
+        kicker="WORKSHOP REPAIR SHEET"
+        title={`Workshop Repair Sheet: ${vehicleNumber || jobNumber}`}
+        badge={
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <Badge
+              variant={
+                docStage === 'INVOICE'
+                  ? 'success'
+                  : docStage === 'JOB_CARD'
+                  ? 'info'
+                  : 'warning'
+              }
+              className="font-bold uppercase tracking-wider text-[10px]"
+              data-testid="sheet-stage-badge"
+            >
+              {docStage}
+            </Badge>
+            <Badge
+              variant={
+                dynamicPaymentStatus === 'PAID'
+                  ? 'success'
+                  : dynamicPaymentStatus === 'PARTIALLY_PAID'
+                  ? 'warning'
+                  : 'destructive'
+              }
+              className="font-bold uppercase tracking-wider text-[10px]"
+              data-testid="sheet-payment-status-badge"
+            >
+              {dynamicPaymentStatus}
+            </Badge>
           </div>
-        </div>
+        }
+        description={
+          currentId
+            ? `Job #${jobNumber}${vehicleMake || vehicleModel ? ` • ${vehicleMake} ${vehicleModel}` : ''}`
+            : 'New Repair Job Order'
+        }
+        breadcrumbs={[
+          { label: 'Jobs', href: '/workshop/jobs' },
+          { label: vehicleNumber || jobNumber || 'New Sheet' },
+        ]}
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Permission-gated Admin Cost & Profit Mode Switch */}
+            {role !== 'TECHNICIAN' && permissions.canViewCosts && permissions.canViewGrossProfit && (
+              <div className="flex items-center gap-2 px-2.5 py-1 bg-slate-100/90 border border-slate-200 rounded-lg">
+                <Lock className="w-3.5 h-3.5 text-slate-500" />
+                <span className="text-xs font-semibold text-slate-700 select-none hidden sm:inline">Admin Cost</span>
+                <SwitchiOSTactile
+                  checked={isCostProfitVisible}
+                  onChange={setCostProfitVisible}
+                  data-testid="admin-cost-mode-switch"
+                />
+              </div>
+            )}
 
-        {/* Right Actions: Conversion buttons, Print, WhatsApp, Save */}
-        <div className="flex flex-wrap items-center gap-2">
-          {/* 1-Click Conversion to Job Card button (Authorized Roles Only) */}
-          {role !== 'TECHNICIAN' && permissions.canManageJobCards && (docStage === 'QUOTATION' || docStage === 'ESTIMATE') && (
-            <Button
-              type="button"
-              variant="default"
-              size="sm"
-              onClick={handleConvertToJobCard}
-              className="text-xs h-8 bg-blue-600 hover:bg-blue-700 text-white font-bold gap-1.5 shadow-xs"
-              data-testid="convert-to-job-card-btn"
-            >
-              <CheckCircle2 className="w-3.5 h-3.5" />
-              <span>Convert to Job Card</span>
-            </Button>
-          )}
+            {/* 1-Click Conversion to Job Card button (Authorized Roles Only) */}
+            {role !== 'TECHNICIAN' && permissions.canManageJobCards && (docStage === 'QUOTATION' || docStage === 'ESTIMATE') && (
+              <Button
+                type="button"
+                variant="default"
+                size="sm"
+                onClick={handleConvertToJobCard}
+                className="text-xs h-8 bg-blue-600 hover:bg-blue-700 text-white font-bold gap-1.5 shadow-xs"
+                data-testid="convert-to-job-card-btn"
+              >
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>Convert to Job Card</span>
+              </Button>
+            )}
 
-          {/* 1-Click Conversion to Invoice button (Authorized Roles Only) */}
-          {role !== 'TECHNICIAN' && permissions.canManageJobCards && (docStage === 'JOB_CARD' || docStage === 'ESTIMATE') && (
-            <Button
-              type="button"
-              variant="default"
-              size="sm"
-              onClick={handleConvertToInvoice}
-              className="text-xs h-8 bg-emerald-600 hover:bg-emerald-700 text-white font-bold gap-1.5 shadow-xs"
-              data-testid="convert-to-invoice-btn"
-            >
-              <FileCheck className="w-3.5 h-3.5" />
-              <span>Convert to Invoice</span>
-            </Button>
-          )}
+            {/* 1-Click Conversion to Invoice button (Authorized Roles Only) */}
+            {role !== 'TECHNICIAN' && permissions.canManageJobCards && (docStage === 'JOB_CARD' || docStage === 'ESTIMATE') && (
+              <Button
+                type="button"
+                variant="default"
+                size="sm"
+                onClick={handleConvertToInvoice}
+                className="text-xs h-8 bg-emerald-600 hover:bg-emerald-700 text-white font-bold gap-1.5 shadow-xs"
+                data-testid="convert-to-invoice-btn"
+              >
+                <FileCheck className="w-3.5 h-3.5" />
+                <span>Convert to Invoice</span>
+              </Button>
+            )}
 
-          {/* Payment Collection Button (Authorized Roles Only) */}
-          {role !== 'TECHNICIAN' && (
+            {/* Direct link to Invoicing & Split Billing Studio when in INVOICE stage */}
+            {docStage === 'INVOICE' && id && (
+              <Link to={`/workshop/invoice/${id}`}>
+                <Button
+                  type="button"
+                  variant="default"
+                  size="sm"
+                  className="text-xs h-8 bg-emerald-600 hover:bg-emerald-700 text-white font-bold gap-1.5 shadow-xs"
+                  data-testid="open-invoice-terminal-btn"
+                >
+                  <Receipt className="w-3.5 h-3.5" />
+                  <span>Invoice Studio</span>
+                </Button>
+              </Link>
+            )}
+
+            {/* Payment Collection Button (Authorized Roles Only) */}
+            {role !== 'TECHNICIAN' && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setIsPaymentModalOpen(true)}
+                className="text-xs h-8 bg-amber-50 hover:bg-amber-100 text-amber-900 border-amber-300 font-bold gap-1.5 shadow-xs"
+                data-testid="collect-payment-btn"
+              >
+                <CreditCard className="w-3.5 h-3.5 text-amber-700" />
+                <span>Collect Payment</span>
+              </Button>
+            )}
+
+            {/* Document Stage Conversion Selector (Authorized Roles Only) */}
+            {role !== 'TECHNICIAN' && permissions.canManageJobCards && (
+              <div className="flex items-center bg-slate-100 rounded-lg p-0.5 border border-slate-200">
+                {(['QUOTATION', 'ESTIMATE', 'JOB_CARD', 'INVOICE'] as DocumentStage[]).map(
+                  (stage) => (
+                    <button
+                      key={stage}
+                      type="button"
+                      onClick={() => handleStageTransition(stage)}
+                      className={cn(
+                        'px-2.5 py-1 text-xs font-semibold rounded-md transition-all cursor-pointer',
+                        docStage === stage
+                          ? 'bg-white text-slate-900 shadow-2xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      )}
+                      data-testid={`stage-toggle-${stage.toLowerCase()}`}
+                    >
+                      {stage === 'JOB_CARD' ? 'Job Card' : stage.charAt(0) + stage.slice(1).toLowerCase()}
+                    </button>
+                  )
+                )}
+              </div>
+            )}
+
             <Button
               type="button"
               variant="outline"
               size="sm"
-              onClick={() => setIsPaymentModalOpen(true)}
-              className="text-xs h-8 bg-amber-50 hover:bg-amber-100 text-amber-900 border-amber-300 font-bold gap-1.5 shadow-xs"
-              data-testid="collect-payment-btn"
+              onClick={handleTriggerPrint}
+              className="text-xs h-8 border-slate-300 font-semibold gap-1.5"
+              data-testid="print-sheet-btn"
             >
-              <CreditCard className="w-3.5 h-3.5 text-amber-700" />
-              <span>Collect Payment</span>
+              <Printer className="w-3.5 h-3.5 text-slate-600" />
+              <span className="hidden sm:inline">Print A4</span>
             </Button>
-          )}
 
-          {/* Document Stage Conversion Selector (Authorized Roles Only) */}
-          {role !== 'TECHNICIAN' && permissions.canManageJobCards && (
-            <div className="flex items-center bg-slate-100 rounded-lg p-0.5 border border-slate-200">
-              {(['QUOTATION', 'ESTIMATE', 'JOB_CARD', 'INVOICE'] as DocumentStage[]).map(
-                (stage) => (
-                  <button
-                    key={stage}
-                    type="button"
-                    onClick={() => handleStageTransition(stage)}
-                    className={cn(
-                      'px-2.5 py-1 text-xs font-semibold rounded-md transition-all cursor-pointer',
-                      docStage === stage
-                        ? 'bg-white text-slate-900 shadow-2xs'
-                        : 'text-slate-600 hover:text-slate-900'
-                    )}
-                    data-testid={`stage-toggle-${stage.toLowerCase()}`}
-                  >
-                    {stage === 'JOB_CARD' ? 'Job Card' : stage.charAt(0) + stage.slice(1).toLowerCase()}
-                  </button>
-                )
-              )}
-            </div>
-          )}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleShareWhatsApp}
+              className="text-xs h-8 border-emerald-300 text-emerald-800 hover:bg-emerald-50 font-semibold gap-1.5"
+              data-testid="whatsapp-share-btn"
+            >
+              <Share2 className="w-3.5 h-3.5 text-emerald-600" />
+              <span className="hidden sm:inline">WhatsApp</span>
+            </Button>
 
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={handleTriggerPrint}
-            className="text-xs h-8 border-slate-300 font-semibold gap-1.5"
-            data-testid="print-sheet-btn"
-          >
-            <Printer className="w-3.5 h-3.5 text-slate-600" />
-            <span className="hidden sm:inline">Print A4</span>
-          </Button>
-
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={handleShareWhatsApp}
-            className="text-xs h-8 border-emerald-300 text-emerald-800 hover:bg-emerald-50 font-semibold gap-1.5"
-            data-testid="whatsapp-share-btn"
-          >
-            <Share2 className="w-3.5 h-3.5 text-emerald-600" />
-            <span className="hidden sm:inline">WhatsApp</span>
-          </Button>
-
-          <Button
-            type="button"
-            variant="default"
-            size="sm"
-            onClick={handleSave}
-            disabled={isSaving}
-            className="text-xs h-8 bg-amber-600 hover:bg-amber-700 text-white font-bold gap-1.5 shadow-xs"
-            data-testid="save-sheet-btn"
-          >
-            <Save className="w-3.5 h-3.5" />
-            <span>{isSaving ? 'Saving...' : 'Save Sheet'}</span>
-          </Button>
-        </div>
-      </div>
+            <Button
+              type="button"
+              variant="default"
+              size="sm"
+              onClick={handleSave}
+              disabled={isSaving}
+              className="text-xs h-8 bg-[#F95700] hover:bg-[#EA580C] text-white font-bold gap-1.5 shadow-xs"
+              data-testid="save-sheet-btn"
+            >
+              <Save className="w-3.5 h-3.5" />
+              <span>{isSaving ? 'Saving...' : 'Save Sheet'}</span>
+            </Button>
+          </div>
+        }
+      />
 
       {/* Original Estimate Snapshot Frozen Banner */}
       {originalSnapshot && (
@@ -929,9 +978,22 @@ export function RepairSheetPage() {
               const origTotal = parsed.grandTotalSalesRs ?? parsed.financials?.grandTotalSalesRs ?? 0;
               const origCount = parsed.lines?.length ?? 0;
               return (
-                <div className="flex items-center gap-2 shrink-0 font-mono text-[11px] bg-white px-2.5 py-1 rounded border border-blue-200 shadow-2xs">
-                  <span>Baseline Total: <strong className="text-slate-900">{formatRs(origTotal)}</strong></span>
-                  <span className="text-slate-500">({origCount} items)</span>
+                <div className="flex items-center gap-2 shrink-0">
+                  <div className="flex items-center gap-2 font-sans tabular-nums text-[11px] bg-white px-2.5 py-1 rounded border border-blue-200 shadow-2xs">
+                    <span>Baseline Total: <strong className="text-slate-900">{formatRs(origTotal)}</strong></span>
+                    <span className="text-slate-500">({origCount} items)</span>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsSnapshotDrawerOpen(true)}
+                    className="h-7 text-[10px] bg-white hover:bg-blue-50 text-blue-900 border-blue-300 font-bold shadow-2xs gap-1"
+                    data-testid="view-snapshot-drawer-btn"
+                  >
+                    <Shield className="w-3 h-3 text-blue-600" />
+                    <span>View Snapshot</span>
+                  </Button>
                 </div>
               );
             } catch {
@@ -941,22 +1003,31 @@ export function RepairSheetPage() {
         </div>
       )}
 
-      {/* 12-Field Vehicle / Insurance / Customer Header Form Grid */}
+      {/* Original Estimate Snapshot Drawer */}
+      <OriginalEstimateSnapshotDrawer
+        open={isSnapshotDrawerOpen}
+        onClose={() => setIsSnapshotDrawerOpen(false)}
+        originalEstimate={originalSnapshot ? JSON.parse(originalSnapshot) : null}
+        currentDocument={{
+          grandTotal: financials.grandTotalSalesRs,
+          grandTotalSalesRs: financials.grandTotalSalesRs,
+          lines,
+        }}
+      />
+
+      {/* Vehicle / Insurance / Customer Header Form Grid */}
       <div
-        className="bg-white rounded-xl border border-slate-300 p-5 shadow-xs space-y-4 no-print"
+        className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs space-y-4 no-print"
         data-testid="sheet-header-grid"
       >
-        <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
           <div className="flex items-center gap-2">
-            <h2 className="text-xs font-black uppercase tracking-wider text-slate-700">
-              Vehicle, Insurance & Customer Information (12-Field Header)
+            <h2 className="text-sm font-bold text-slate-900">
+              Vehicle & Customer Details
             </h2>
-            <span className="text-[11px] text-slate-400">
-              • Direct freeform entry (No CRM pre-registration required)
-            </span>
           </div>
           {floorStatus && (
-            <Badge variant="outline" className="text-[11px] font-mono">
+            <Badge variant="outline" className="text-[11px] font-sans font-medium text-slate-600 bg-slate-50">
               Status: {floorStatus.replace(/_/g, ' ')}
             </Badge>
           )}
@@ -965,222 +1036,187 @@ export function RepairSheetPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 text-xs">
           {/* Row 1: Date | Job Number */}
           <div className="space-y-1">
-            <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider">
-              Date:
+            <label className="block text-[11px] font-medium text-slate-500 mb-1">
+              Date
             </label>
             <Input
               type="date"
               value={date}
               onChange={(e) => setDate(e.target.value)}
-              className="h-8 text-xs font-medium"
+              className="h-8 text-xs px-2.5 rounded-lg border border-slate-200 bg-white focus:border-slate-900 focus:ring-1 focus:ring-slate-900 font-medium"
               data-testid="header-date"
             />
           </div>
 
           <div className="space-y-1">
-            <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider">
-              Job Number:
+            <label className="block text-[11px] font-medium text-slate-500 mb-1">
+              Job number
             </label>
             <Input
               type="text"
               value={jobNumber}
               onChange={(e) => setJobNumber(e.target.value.toUpperCase())}
-              className="h-8 text-xs font-bold font-mono text-slate-800 bg-slate-50"
+              className="h-8 text-xs px-2.5 rounded-lg border border-slate-200 focus:border-slate-900 focus:ring-1 focus:ring-slate-900 font-bold font-sans tabular-nums text-slate-800 bg-slate-50"
               data-testid="header-job-number"
             />
           </div>
 
           {/* Row 2: Vehicle Number (Integrated VehicleLookupInput) | Nature of Repair */}
           <div className="space-y-1">
-            <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider">
-              Vehicle Number:
+            <label className="block text-[11px] font-medium text-slate-500 mb-1">
+              Vehicle number
             </label>
             <VehicleLookupInput
               value={vehicleNumber}
               onChange={setVehicleNumber}
               onPopulate={handleVehiclePopulate}
               placeholder="e.g. CAB-4521 or WP CBA-1234"
-              className="h-8 text-xs font-bold font-mono"
             />
           </div>
 
           <div className="space-y-1">
-            <div className="flex items-center justify-between">
-              <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider">
-                Nature of Repair:
-              </label>
-              <div className="flex gap-1 overflow-x-auto pb-0.5">
-                {NATURE_OF_REPAIR_PRESETS.map((preset) => (
-                  <button
-                    key={preset}
-                    type="button"
-                    onClick={() => setNatureOfRepair(preset)}
-                    className="text-[9px] px-1.5 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-600 whitespace-nowrap cursor-pointer"
-                  >
-                    {preset}
-                  </button>
-                ))}
-              </div>
-            </div>
+            <label className="block text-[11px] font-medium text-slate-500 mb-1">
+              Nature of repair
+            </label>
+            <datalist id="nature-repair-presets">
+              {NATURE_OF_REPAIR_PRESETS.map((preset) => (
+                <option key={preset} value={preset} />
+              ))}
+            </datalist>
             <Input
               type="text"
+              list="nature-repair-presets"
               value={natureOfRepair}
               onChange={(e) => setNatureOfRepair(e.target.value)}
               placeholder="e.g. Accident Damage Front Left Side & Bumper Replacement"
-              className="h-8 text-xs"
+              className="h-8 text-xs px-2.5 rounded-lg border border-slate-200 bg-white focus:border-slate-900 focus:ring-1 focus:ring-slate-900"
               data-testid="header-nature-of-repair"
             />
           </div>
 
           {/* Row 3: Vehicle Make | Chassis Number */}
           <div className="space-y-1">
-            <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider">
-              Vehicle Make:
+            <label className="block text-[11px] font-medium text-slate-500 mb-1">
+              Vehicle make
             </label>
             <Input
               type="text"
               value={vehicleMake}
               onChange={(e) => setVehicleMake(e.target.value)}
               placeholder="e.g. Toyota, Honda, Nissan, Suzuki"
-              className="h-8 text-xs"
+              className="h-8 text-xs px-2.5 rounded-lg border border-slate-200 bg-white focus:border-slate-900 focus:ring-1 focus:ring-slate-900"
               data-testid="header-vehicle-make"
             />
           </div>
 
           <div className="space-y-1">
-            <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider">
-              Chassis Number:
+            <label className="block text-[11px] font-medium text-slate-500 mb-1">
+              Chassis number
             </label>
             <Input
               type="text"
               value={chassisNumber}
               onChange={(e) => setChassisNumber(e.target.value.toUpperCase())}
               placeholder="e.g. NZE141-9034821"
-              className="h-8 text-xs font-mono"
+              className="h-8 text-xs px-2.5 rounded-lg border border-slate-200 bg-white focus:border-slate-900 focus:ring-1 focus:ring-slate-900 font-mono"
               data-testid="header-chassis-number"
             />
           </div>
 
           {/* Row 4: Vehicle Model | No of Days Completion */}
           <div className="space-y-1">
-            <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider">
-              Vehicle Model:
+            <label className="block text-[11px] font-medium text-slate-500 mb-1">
+              Vehicle model
             </label>
             <Input
               type="text"
               value={vehicleModel}
               onChange={(e) => setVehicleModel(e.target.value)}
               placeholder="e.g. Corolla Axio, Vezel Hybrid, Wagon R"
-              className="h-8 text-xs"
+              className="h-8 text-xs px-2.5 rounded-lg border border-slate-200 bg-white focus:border-slate-900 focus:ring-1 focus:ring-slate-900"
               data-testid="header-vehicle-model"
             />
           </div>
 
           <div className="space-y-1">
-            <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider">
-              No of Days Completion:
+            <label className="block text-[11px] font-medium text-slate-500 mb-1">
+              Days for completion
             </label>
             <Input
               type="text"
               value={daysForCompletion}
               onChange={(e) => setDaysForCompletion(e.target.value)}
               placeholder="e.g. 4 Days or 1 Week"
-              className="h-8 text-xs"
+              className="h-8 text-xs px-2.5 rounded-lg border border-slate-200 bg-white focus:border-slate-900 focus:ring-1 focus:ring-slate-900"
               data-testid="header-days-for-completion"
             />
           </div>
 
           {/* Row 5: Year of Make | Vehicle Color */}
           <div className="space-y-1">
-            <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider">
-              Year of Make:
+            <label className="block text-[11px] font-medium text-slate-500 mb-1">
+              Year of make
             </label>
             <Input
               type="text"
               value={yearOfMake}
               onChange={(e) => setYearOfMake(e.target.value)}
               placeholder="e.g. 2018"
-              className="h-8 text-xs font-mono"
+              className="h-8 text-xs px-2.5 rounded-lg border border-slate-200 bg-white focus:border-slate-900 focus:ring-1 focus:ring-slate-900 font-mono"
               data-testid="header-year-of-make"
             />
           </div>
 
           <div className="space-y-1">
-            <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider">
-              Vehicle Color:
+            <label className="block text-[11px] font-medium text-slate-500 mb-1">
+              Vehicle color
             </label>
             <Input
               type="text"
               value={vehicleColor}
               onChange={(e) => setVehicleColor(e.target.value)}
               placeholder="e.g. Pearl White (070), Silver Metallic"
-              className="h-8 text-xs"
+              className="h-8 text-xs px-2.5 rounded-lg border border-slate-200 bg-white focus:border-slate-900 focus:ring-1 focus:ring-slate-900"
               data-testid="header-vehicle-color"
             />
           </div>
 
           {/* Row 6 (Full Width): Name of Insurance */}
           <div className="md:col-span-2 space-y-1">
-            <div className="flex items-center justify-between">
-              <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider">
-                Name of Insurance:
-              </label>
-              <div className="flex gap-1 overflow-x-auto pb-0.5">
-                {INSURANCE_PRESETS.map((preset) => (
-                  <button
-                    key={preset}
-                    type="button"
-                    onClick={() => setInsuranceName(preset)}
-                    className="text-[9px] px-1.5 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-600 whitespace-nowrap cursor-pointer"
-                  >
-                    {preset.split(' ')[0]}
-                  </button>
-                ))}
-              </div>
-            </div>
+            <label className="block text-[11px] font-medium text-slate-500 mb-1">
+              Name of insurance
+            </label>
+            <datalist id="insurance-presets">
+              {INSURANCE_PRESETS.map((preset) => (
+                <option key={preset} value={preset} />
+              ))}
+            </datalist>
             <Input
               type="text"
+              list="insurance-presets"
               value={insuranceName}
               onChange={(e) => setInsuranceName(e.target.value)}
               placeholder="e.g. Sri Lanka Insurance Corporation (SLIC) or Direct Cash"
-              className="h-8 text-xs font-medium"
+              className="h-8 text-xs px-2.5 rounded-lg border border-slate-200 bg-white focus:border-slate-900 focus:ring-1 focus:ring-slate-900 font-medium"
               data-testid="header-insurance-name"
             />
           </div>
 
           {/* Row 7 (Full Width): Customer Information */}
           <div className="md:col-span-2 space-y-1">
-            <label className="block text-[11px] font-bold text-slate-600 uppercase tracking-wider">
-              Customer Information:
+            <label className="block text-[11px] font-medium text-slate-500 mb-1">
+              Customer information
             </label>
             <Input
               type="text"
               value={customerInfo}
               onChange={(e) => setCustomerInfo(e.target.value)}
               placeholder="Type customer name, phone number, and address directly (e.g. Kasun Perera - 077 889 1234 / No 45, Galle Road)"
-              className="h-8 text-xs"
+              className="h-8 text-xs px-2.5 rounded-lg border border-slate-200 bg-white focus:border-slate-900 focus:ring-1 focus:ring-slate-900"
               data-testid="header-customer-info"
             />
           </div>
         </div>
-      </div>
-
-      {/* Preset Insertion Area: CatalogCombobox */}
-      <div className="bg-white rounded-xl border border-slate-300 p-4 shadow-xs space-y-2 no-print">
-        <div className="flex items-center justify-between">
-          <label className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-            <Sparkles className="w-4 h-4 text-amber-500" />
-            Quick Preset Insertion (Parts & Labor Catalog)
-          </label>
-          <span className="text-[11px] text-slate-400">
-            Auto-routes to Remove/Reassemble, Repair, or Replacement table
-          </span>
-        </div>
-        <CatalogCombobox
-          onSelect={handleAddCatalogPreset}
-          onSelectCustom={handleAddCustomCatalogItem}
-          placeholder="Search catalog by SKU, part name, labor preset, or vehicle model..."
-        />
       </div>
 
       {/* 3 Dynamic Line-Item Tables */}
@@ -1207,20 +1243,67 @@ export function RepairSheetPage() {
           onItemsChange={setLines}
         />
 
-        {/* Table 3: Replacement (Spare Parts & Materials) */}
-        <WorkshopTable
-          category="REPLACEMENT"
-          title="Replacement"
-          sectionNumber={3}
-          items={lines}
-          isCostProfitVisible={canShowCostProfit}
-          isJobCardMode={isJobCardMode}
-          onItemsChange={setLines}
-        />
+        {/* Table 3: Replacement (Spare Parts & Materials) with Sleek Compact Search Directly Above */}
+        <div className="space-y-2">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1 no-print">
+            <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700 uppercase tracking-wider">
+              <Package className="w-3.5 h-3.5 text-slate-500" />
+              <span>3. Replacement (Spare Parts & Materials)</span>
+            </div>
+            <div className="w-full sm:w-80 lg:w-96">
+              <CatalogCombobox
+                onSelect={handleAddCatalogPreset}
+                onSelectCustom={handleAddCustomCatalogItem}
+                placeholder="Quick add part from catalog (SKU, name)..."
+              />
+            </div>
+          </div>
+
+          <WorkshopTable
+            category="REPLACEMENT"
+            title="Replacement"
+            sectionNumber={3}
+            items={lines}
+            isCostProfitVisible={canShowCostProfit}
+            isJobCardMode={isJobCardMode}
+            onItemsChange={setLines}
+          />
+        </div>
       </div>
 
-      {/* Financials & Embedded Profit Summary */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 no-print">
+      {/* Section 3: Settlement, Split Billing & Totals */}
+      <div className="space-y-6 no-print">
+        {/* The 3 KPI Summary Cards */}
+        {role !== 'TECHNICIAN' && (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-2xs">
+              <span className="text-xs font-semibold text-slate-500 block">Customer Selling Total</span>
+              <span className="text-xl font-bold font-sans tabular-nums text-slate-900 mt-1 block">
+                {formatRs(financials.grandTotalSalesRs)}
+              </span>
+            </div>
+            <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-2xs">
+              <span className="text-xs font-semibold text-slate-500 block">Total Direct Buying Cost</span>
+              <span className="text-xl font-bold font-sans tabular-nums text-slate-900 mt-1 block">
+                {canShowCostProfit ? formatRs(financials.totalBuyingCostRs) : '••••••'}
+              </span>
+            </div>
+            <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-2xs">
+              <span className="text-xs font-semibold text-slate-500 block">Split Billing Balance Due</span>
+              <span
+                className={cn(
+                  'text-xl font-bold font-sans tabular-nums mt-1 block',
+                  financials.balanceDueRs > 0 ? 'text-amber-600' : 'text-slate-900'
+                )}
+              >
+                {formatRs(financials.balanceDueRs)}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Financials & Embedded Profit Summary */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {role === 'TECHNICIAN' ? (
           <div
             className="bg-white rounded-xl border border-slate-300 p-5 shadow-xs space-y-4"
@@ -1579,6 +1662,7 @@ export function RepairSheetPage() {
             </p>
           </div>
         )}
+        </div>
       </div>
 
       {/* Audit Trail & Operational History */}
@@ -1612,6 +1696,97 @@ export function RepairSheetPage() {
                 </span>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Sticky Bottom Executive Margin & Total Bar */}
+      {role !== 'TECHNICIAN' && (
+        <div
+          className="sticky bottom-4 z-20 mx-auto max-w-7xl bg-white/95 backdrop-blur-md border border-slate-200/90 rounded-2xl p-4 shadow-xl flex flex-wrap items-center justify-between gap-4 no-print"
+          data-testid="executive-margin-bottom-bar"
+        >
+          <div className="flex flex-wrap items-center gap-6 text-xs">
+            <div>
+              <span className="text-slate-400 font-medium block text-[10px] uppercase tracking-wider">Labor Subtotal</span>
+              <span className="font-bold text-slate-800 font-sans tabular-nums text-sm">
+                {formatRs(financials.subtotalRemoveReassembleRs + financials.subtotalRepairRs)}
+              </span>
+            </div>
+            <div className="h-6 w-px bg-slate-200 hidden sm:block" />
+            <div>
+              <span className="text-slate-400 font-medium block text-[10px] uppercase tracking-wider">Parts Subtotal</span>
+              <span className="font-bold text-slate-800 font-sans tabular-nums text-sm">
+                {formatRs(financials.subtotalReplacementRs)}
+              </span>
+            </div>
+            <div className="h-6 w-px bg-slate-200 hidden sm:block" />
+            <div>
+              <span className="text-slate-400 font-medium block text-[10px] uppercase tracking-wider">Gross Total</span>
+              <span className="font-extrabold text-slate-900 font-sans tabular-nums text-sm">
+                {formatRs(financials.grandTotalSalesRs)}
+              </span>
+            </div>
+
+            {/* Permission-gated Admin Cost & Profit details */}
+            {canShowCostProfit && (
+              <>
+                <div className="h-6 w-px bg-amber-200 hidden md:block" />
+                <div className="bg-amber-50/80 border border-amber-200/80 rounded-xl px-3 py-1.5 flex items-center gap-4">
+                  <div>
+                    <span className="text-amber-700/80 font-medium block text-[9px] uppercase tracking-wider">Total Cost</span>
+                    <span className="font-bold text-red-700 font-sans tabular-nums text-xs" data-testid="bottom-bar-total-cost">
+                      {formatRs(financials.totalBuyingCostRs)}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-amber-700/80 font-medium block text-[9px] uppercase tracking-wider">Live Profit</span>
+                    <span
+                      className={cn(
+                        'font-black font-sans tabular-nums text-xs',
+                        financials.grossProfitRs >= 0 ? 'text-emerald-700' : 'text-red-700'
+                      )}
+                      data-testid="bottom-bar-gross-profit"
+                    >
+                      {formatRs(financials.grossProfitRs)}
+                    </span>
+                  </div>
+                  <div className="flex flex-col items-end">
+                    <span className="text-amber-700/80 font-medium block text-[9px] uppercase tracking-wider">Margin</span>
+                    <span
+                      className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-black bg-emerald-100 text-emerald-800 border border-emerald-200"
+                      data-testid="bottom-bar-gross-margin"
+                    >
+                      {financials.grossMarginPct}%
+                    </span>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleTriggerPrint}
+              className="text-xs h-8 border-slate-300 font-semibold gap-1.5"
+            >
+              <Printer className="w-3.5 h-3.5 text-slate-600" />
+              <span>Print A4</span>
+            </Button>
+            <Button
+              type="button"
+              variant="default"
+              size="sm"
+              onClick={handleSave}
+              disabled={isSaving}
+              className="text-xs h-8 bg-[#F95700] hover:bg-[#EA580C] text-white font-bold gap-1.5 shadow-xs"
+            >
+              <Save className="w-3.5 h-3.5" />
+              <span>{isSaving ? 'Saving...' : 'Save Sheet'}</span>
+            </Button>
           </div>
         </div>
       )}
@@ -1707,6 +1882,14 @@ export function RepairSheetPage() {
           </div>
         </Dialog>
       )}
-    </div>
+
+      {/* WhatsApp Share Preview Dialog */}
+      <WhatsAppSharePreviewDialog
+        open={isWhatsAppModalOpen}
+        onClose={() => setIsWhatsAppModalOpen(false)}
+        messageText={formatWhatsAppSummary(activeJobSheet)}
+        onSend={handleConfirmWhatsAppSend}
+      />
+    </PageContainer>
   );
 }

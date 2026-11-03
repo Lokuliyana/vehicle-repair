@@ -88,15 +88,18 @@ export interface SalesGrossProfitReportData {
     workshopLabor: RevenueStreamMetric;
     workshopParts: RevenueStreamMetric;
     counterPosSales: RevenueStreamMetric;
+    workshopLaborRR?: RevenueStreamMetric;
+    workshopLaborRepair?: RevenueStreamMetric;
   };
   invoicedJobsCount: number;
   posSalesCount: number;
 }
 
 export type InsuranceAgingBucketKey = '0_30' | '31_60' | '61_90' | '90_PLUS';
+export type GranularInsuranceAgingBucketKey = '0_15' | '16_30' | '31_60' | '60_PLUS';
 
 export interface InsuranceAgingBucketSummary {
-  bucketKey: InsuranceAgingBucketKey;
+  bucketKey: InsuranceAgingBucketKey | GranularInsuranceAgingBucketKey;
   label: string;
   claimCount: number;
   totalApprovedRs: number;
@@ -123,6 +126,7 @@ export interface ItemizedInsuranceClaim {
   agingDays: number;
   agingBucket: InsuranceAgingBucketKey;
   bucketLabel: string;
+  granularBucket?: GranularInsuranceAgingBucketKey;
   approvedClaimRs: number;
   settledAmountRs: number;
   balanceDueRs: number;
@@ -135,6 +139,7 @@ export interface InsuranceAgingReportData {
   totalSettledAmountRs: number;
   totalOutstandingClaimsRs: number;
   buckets: Record<InsuranceAgingBucketKey, InsuranceAgingBucketSummary>;
+  granularBuckets?: Record<GranularInsuranceAgingBucketKey, InsuranceAgingBucketSummary>;
   companySummaries: InsuranceCompanyAgingSummary[];
   itemizedClaims: ItemizedInsuranceClaim[];
 }
@@ -151,6 +156,8 @@ export interface TechnicianTurnaroundMetric {
   avgEstimatedTargetDays: number;
   avgTurnaroundDays: number;
   velocityStatus: TechnicianVelocityStatus;
+  laborEfficiencyIndex?: number;
+  onTimePercentage?: number;
 }
 
 export interface TechnicianVelocityReportData {
@@ -177,6 +184,7 @@ export interface FastMovingPartMetric {
   totalCostRs: number;
   grossProfitRs: number;
   grossMarginPct: number;
+  turnoverRate?: string;
 }
 
 export type StockAlertSeverity = 'OUT_OF_STOCK' | 'LOW_STOCK';
@@ -194,6 +202,8 @@ export interface LowStockAlertItem {
   status: StockAlertSeverity;
   buyingCostRs: number;
   sellingPriceRs: number;
+  turnoverRate?: string;
+  reorderNotes?: string;
 }
 
 export interface InventoryVelocityAndAlertsReportData {
@@ -206,6 +216,8 @@ export interface InventoryVelocityAndAlertsReportData {
 
 export interface ProfitLedgerSummary {
   // High-level combined KPI
+  grossRevenueRs?: number;
+  totalDiscountsRs?: number;
   totalNetSalesRs: number;
   totalDirectCostRs: number;
   combinedGrossProfitRs: number;
@@ -251,6 +263,11 @@ export interface FinanceLedgerItem {
   directCostRs: number;
   operatingExpenseRs: number;
   netProfitContributionRs: number;
+  marginPercent?: number;
+  status?: string;
+  vehiclePlate?: string;
+  vehicleModel?: string;
+  customerName?: string;
   sourceId: string;
   job?: WorkshopJobSheet;
   posSale?: PosSaleTransaction;
