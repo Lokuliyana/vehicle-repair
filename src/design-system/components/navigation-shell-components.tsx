@@ -3,7 +3,6 @@ import { clsx } from 'clsx';
 import { ChevronRight, Shield, Plus, ShoppingCart, Maximize2, Minimize2, LogOut, ChevronDown, Search } from 'lucide-react';
 import { UserRole } from '@/types';
 import { HotKeyKbdChip } from './action-triggers';
-import slogoUrl from '@/assets/slogo.svg';
 
 export interface RolePerspectiveBadgeProps {
   role: UserRole | string;
@@ -172,21 +171,29 @@ export const WorkshopBayStoreSwitcher: React.FC<WorkshopBayStoreSwitcherProps> =
     <div
       onClick={onClick}
       className={clsx(
-        'relative px-3.5 py-3 rounded-xl bg-gradient-to-b from-slate-900 via-slate-950 to-slate-950 border border-slate-800/90 shadow-sm transition-all flex items-center justify-center group select-none cursor-pointer hover:border-slate-700 hover:shadow-md',
+        'relative p-2 rounded-xl bg-white border border-slate-200/90 shadow-[0_1px_3px_rgba(15,23,42,0.04)] hover:border-slate-300 hover:shadow-xs transition-all flex items-center gap-2.5 group select-none cursor-pointer',
         className
       )}
       data-testid={resolvedTestId}
     >
-      <div className="w-full flex items-center justify-center py-0.5">
-        <img
-          src={slogoUrl}
-          alt="Workshop Brand Logo"
-          className="h-9 sm:h-10 w-auto max-w-full object-contain drop-shadow-sm group-hover:scale-[1.02] transition-transform duration-200"
-        />
+      {/* Automotive Monogram / Brand Icon */}
+      <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-slate-900 to-slate-800 text-white flex items-center justify-center shrink-0 shadow-xs border border-slate-700/60 relative">
+        <span className="font-black text-xs tracking-wider text-white">500</span>
+        <span className="w-1.5 h-1.5 rounded-full bg-[#F95700] absolute -top-0.5 -right-0.5" />
       </div>
-      {/* Retain for accessibility and test contract compliance */}
-      <span className="sr-only">{branchName}</span>
-      <span className="sr-only">{activeBays} Active Bays Operating</span>
+
+      {/* Workshop Branch & Live Active Bays Status */}
+      <div className="flex-1 min-w-0">
+        <div className="text-xs font-bold text-slate-900 truncate leading-snug group-hover:text-[#F95700] transition-colors">
+          {branchName}
+        </div>
+        <div className="text-[10px] text-emerald-700 font-semibold flex items-center gap-1.5 truncate mt-0.5">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+          <span>{activeBays} Active Bays Operating</span>
+        </div>
+      </div>
+
+      <ChevronDown className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-600 shrink-0 mr-1" />
     </div>
   );
 };

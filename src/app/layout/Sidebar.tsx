@@ -24,7 +24,6 @@ import {
   SetupChecklistSidebarWidget,
   UserAccountFooterCard,
 } from '@/design-system/components/navigation-shell-components';
-import slogoUrl from '@/assets/slogo.svg';
 
 export interface NavItem {
   title: string;
@@ -153,7 +152,7 @@ export function Sidebar({
     >
       {/* Top Section: Workshop Branch Card & Brand Identity */}
       <div className="flex flex-col gap-2">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-1.5">
           <Link
             to="/"
             onClick={onCloseMobile}
@@ -163,11 +162,12 @@ export function Sidebar({
           >
             {isCollapsed ? (
               <div
-                className="w-11 h-11 mx-auto rounded-xl bg-slate-950 border border-slate-800 text-white flex items-center justify-center shadow-md hover:scale-105 hover:border-slate-700 transition-all cursor-pointer p-1.5"
+                className="w-10 h-10 mx-auto rounded-xl bg-slate-900 border border-slate-800 text-white flex items-center justify-center shadow-xs hover:scale-105 hover:bg-slate-800 transition-all cursor-pointer relative group"
                 data-testid="workshop-bay-switcher-collapsed"
-                title="Workshop Dashboard Home"
+                title="500 Labs — Main Workshop (4 Active Bays Operating)"
               >
-                <img src={slogoUrl} alt="Workshop Logo" className="w-full h-full object-contain drop-shadow-xs" />
+                <span className="font-black text-xs tracking-wider text-white">500</span>
+                <span className="w-2 h-2 rounded-full bg-emerald-500 absolute -top-0.5 -right-0.5 ring-2 ring-white animate-pulse" />
                 <span className="sr-only">500 Labs — Main Workshop (4 Active Bays Operating)</span>
               </div>
             ) : (
