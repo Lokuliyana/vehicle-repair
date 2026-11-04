@@ -24,6 +24,7 @@ import {
   SetupChecklistSidebarWidget,
   UserAccountFooterCard,
 } from '@/design-system/components/navigation-shell-components';
+import slogoUrl from '@/assets/slogo.svg';
 
 export interface NavItem {
   title: string;
@@ -151,8 +152,44 @@ export function Sidebar({
       )}
     >
       {/* Top Section: Workshop Branch Card & Brand Identity */}
-      <div className="flex flex-col gap-2">
-        <div className="flex items-center justify-between gap-1.5">
+      {isCollapsed ? (
+        <div className="flex flex-col items-center gap-2 pb-2.5 border-b border-slate-100">
+          <Link
+            to="/"
+            onClick={onCloseMobile}
+            data-testid="sidebar-brand-link"
+            className="flex items-center justify-center group"
+            title="Workshop Dashboard Home"
+          >
+            <div
+              className="w-12 h-9 rounded-xl bg-slate-950 border border-slate-800 text-white flex items-center justify-center shadow-2xs hover:border-slate-700 hover:scale-105 transition-all cursor-pointer px-1 py-1"
+              data-testid="workshop-bay-switcher-collapsed"
+              title="500 Labs — Main Workshop (4 Active Bays Operating)"
+            >
+              <img
+                src={slogoUrl}
+                alt="Speed Up"
+                className="h-4.5 w-auto max-w-full object-contain drop-shadow-xs"
+              />
+              <span className="sr-only">500 Labs — Main Workshop (4 Active Bays Operating)</span>
+            </div>
+          </Link>
+
+          {!onCloseMobile && (
+            <button
+              type="button"
+              onClick={handleToggle}
+              className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer shrink-0"
+              title="Expand sidebar"
+              aria-label="Expand sidebar"
+              data-testid="sidebar-collapse-toggle"
+            >
+              <PanelLeftOpen size={16} strokeWidth={1.75} />
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="flex items-center justify-between gap-1.5 pb-2.5 border-b border-slate-100">
           <Link
             to="/"
             onClick={onCloseMobile}
@@ -160,46 +197,27 @@ export function Sidebar({
             className="flex-1 min-w-0"
             title="Workshop Dashboard Home"
           >
-            {isCollapsed ? (
-              <div
-                className="w-10 h-10 mx-auto rounded-xl bg-slate-900 border border-slate-800 text-white flex items-center justify-center shadow-xs hover:scale-105 hover:bg-slate-800 transition-all cursor-pointer relative group"
-                data-testid="workshop-bay-switcher-collapsed"
-                title="500 Labs — Main Workshop (4 Active Bays Operating)"
-              >
-                <span className="font-black text-xs tracking-wider text-white">500</span>
-                <span className="w-2 h-2 rounded-full bg-emerald-500 absolute -top-0.5 -right-0.5 ring-2 ring-white animate-pulse" />
-                <span className="sr-only">500 Labs — Main Workshop (4 Active Bays Operating)</span>
-              </div>
-            ) : (
-              <WorkshopBayStoreSwitcher
-                branchName="500 Labs — Main Workshop"
-                activeBays={4}
-                dataTestId="workshop-bay-switcher"
-              />
-            )}
+            <WorkshopBayStoreSwitcher
+              branchName="500 Labs — Main Workshop"
+              activeBays={4}
+              dataTestId="workshop-bay-switcher"
+            />
           </Link>
 
           {!onCloseMobile && (
             <button
               type="button"
               onClick={handleToggle}
-              className={cn(
-                'p-1.5 text-slate-400 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer shrink-0',
-                isCollapsed && 'w-full flex items-center justify-center mt-1'
-              )}
-              title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-              aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer shrink-0"
+              title="Collapse sidebar"
+              aria-label="Collapse sidebar"
               data-testid="sidebar-collapse-toggle"
             >
-              {isCollapsed ? (
-                <PanelLeftOpen size={16} strokeWidth={1.75} />
-              ) : (
-                <PanelLeftClose size={16} strokeWidth={1.75} />
-              )}
+              <PanelLeftClose size={16} strokeWidth={1.75} />
             </button>
           )}
         </div>
-      </div>
+      )}
 
       {/* Center Navigation Links: Grouped Under 10px Uppercase Slate Section Titles */}
       <div className="flex-1 py-1 space-y-1 overflow-y-auto">

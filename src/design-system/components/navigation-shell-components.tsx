@@ -3,6 +3,7 @@ import { clsx } from 'clsx';
 import { ChevronRight, Shield, Plus, ShoppingCart, Maximize2, Minimize2, LogOut, ChevronDown, Search } from 'lucide-react';
 import { UserRole } from '@/types';
 import { HotKeyKbdChip } from './action-triggers';
+import slogoUrl from '@/assets/slogo.svg';
 
 export interface RolePerspectiveBadgeProps {
   role: UserRole | string;
@@ -162,7 +163,7 @@ export const WorkshopBayStoreSwitcher: React.FC<WorkshopBayStoreSwitcherProps> =
   branchName = '500 Labs — Main Workshop',
   activeBays = 4,
   className,
-  dataTestId = 'sidebar-brand-link',
+  dataTestId = 'workshop-bay-switcher',
   onClick,
   ...rest
 }) => {
@@ -171,29 +172,29 @@ export const WorkshopBayStoreSwitcher: React.FC<WorkshopBayStoreSwitcherProps> =
     <div
       onClick={onClick}
       className={clsx(
-        'relative p-2 rounded-xl bg-white border border-slate-200/90 shadow-[0_1px_3px_rgba(15,23,42,0.04)] hover:border-slate-300 hover:shadow-xs transition-all flex items-center gap-2.5 group select-none cursor-pointer',
+        'relative px-2.5 py-1.5 rounded-xl bg-white hover:bg-slate-50 border border-slate-200/90 shadow-2xs transition-all flex items-center gap-2.5 group select-none cursor-pointer',
         className
       )}
       data-testid={resolvedTestId}
     >
-      {/* Automotive Monogram / Brand Icon */}
-      <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-slate-900 to-slate-800 text-white flex items-center justify-center shrink-0 shadow-xs border border-slate-700/60 relative">
-        <span className="font-black text-xs tracking-wider text-white">500</span>
-        <span className="w-1.5 h-1.5 rounded-full bg-[#F95700] absolute -top-0.5 -right-0.5" />
+      {/* High-contrast dark emblem for slogo.svg with 2.68:1 optical aspect ratio */}
+      <div className="h-8.5 w-16 px-1 rounded-lg bg-slate-950 border border-slate-800/90 shadow-2xs flex items-center justify-center shrink-0 group-hover:border-slate-700 transition-colors">
+        <img
+          src={slogoUrl}
+          alt="Speed Up"
+          className="h-4.5 w-auto max-w-full object-contain drop-shadow-xs"
+        />
       </div>
 
-      {/* Workshop Branch & Live Active Bays Status */}
-      <div className="flex-1 min-w-0">
-        <div className="text-xs font-bold text-slate-900 truncate leading-snug group-hover:text-[#F95700] transition-colors">
+      <div className="flex flex-col min-w-0 flex-1">
+        <span className="font-bold text-xs text-slate-900 truncate tracking-tight">
           {branchName}
-        </div>
-        <div className="text-[10px] text-emerald-700 font-semibold flex items-center gap-1.5 truncate mt-0.5">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-          <span>{activeBays} Active Bays Operating</span>
-        </div>
+        </span>
+        <span className="text-[10px] text-emerald-600 font-semibold flex items-center gap-1.5 mt-0.5">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0 animate-pulse" />
+          <span className="truncate">{activeBays} Active Bays Operating</span>
+        </span>
       </div>
-
-      <ChevronDown className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-600 shrink-0 mr-1" />
     </div>
   );
 };
